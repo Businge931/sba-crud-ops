@@ -6,8 +6,8 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/Businge931/api-gateway/internal/app/handlers"
-	"github.com/Businge931/api-gateway/internal/core/domain"
+	"github.com/Businge931/sba-crud-ops/internal/app/handlers"
+	"github.com/Businge931/sba-crud-ops/internal/core/domain"
 
 	log "github.com/sirupsen/logrus"
 )

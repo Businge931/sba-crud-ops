@@ -1,4 +1,4 @@
-APP = api-gateway
+APP = sba-crud-ops
 GOBASE = $(shell pwd)
 GOBIN = $(GOBASE)/build/bin
 LINT_PATH = $(GOBASE)/build/lint

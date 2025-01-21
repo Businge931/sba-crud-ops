@@ -3,9 +3,8 @@ package ports
 import (
 	"context"
 
-	"github.com/Businge931/api-gateway/internal/core/domain"
+	"github.com/Businge931/sba-crud-ops/internal/core/domain"
 )
-
 
 type OddsService interface {
 	CreateOdds(ctx context.Context, request domain.CreateOddsRequest) error

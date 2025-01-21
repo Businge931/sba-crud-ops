@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Businge931/api-gateway/internal/core/domain"
+	"github.com/Businge931/sba-crud-ops/internal/core/domain"
 )
 
 // type OddsRepository interface {

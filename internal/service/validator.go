@@ -3,7 +3,7 @@ package service
 import (
 	"time"
 
-	"github.com/Businge931/api-gateway/internal/core/domain"
+	"github.com/Businge931/sba-crud-ops/internal/core/domain"
 )
 
 func ValidateOddsRequest(request domain.CreateOddsRequest) error {

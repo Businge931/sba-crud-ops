@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/Businge931/api-gateway/internal/app/handlers"
-	"github.com/Businge931/api-gateway/internal/db"
-	"github.com/Businge931/api-gateway/internal/env"
-	"github.com/Businge931/api-gateway/internal/repository/postgres"
-	"github.com/Businge931/api-gateway/internal/service"
+	"github.com/Businge931/sba-crud-ops/internal/app/handlers"
+	"github.com/Businge931/sba-crud-ops/internal/db"
+	"github.com/Businge931/sba-crud-ops/internal/env"
+	"github.com/Businge931/sba-crud-ops/internal/repository/postgres"
+	"github.com/Businge931/sba-crud-ops/internal/service"
 
 	log "github.com/sirupsen/logrus"
 )

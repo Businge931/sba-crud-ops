@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/Businge931/api-gateway/internal/core/domain"
-	"github.com/Businge931/api-gateway/internal/core/ports"
+	"github.com/Businge931/sba-crud-ops/internal/core/domain"
+	"github.com/Businge931/sba-crud-ops/internal/core/ports"
+
 	// "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
