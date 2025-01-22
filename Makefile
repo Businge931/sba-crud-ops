@@ -1,8 +1,12 @@
+include .envrc
+
 APP = sba-crud-ops
 GOBASE = $(shell pwd)
 GOBIN = $(GOBASE)/build/bin
 LINT_PATH = $(GOBASE)/build/lint
 MAIN_APP = $(GOBASE)/cmd
+MIGRATIONS_PATH=$(GOBASE)/migrations
+
 
 
 help:
@@ -23,7 +27,17 @@ lint-fix:
 
 install-golangci: ## Install the correct version of lint
 	@GOBIN=$(LINT_PATH) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.58.1
-	
+
+migrate-up: ## Run the migration up
+	@migrate -path=$(MIGRATIONS_PATH) -database=$(DB_ADDR) up $(filter-out $@,$(MAKECMDGOALS))
+
+migrate-down: ## Run the migration down
+	@migrate -path=$(MIGRATIONS_PATH) -database=$(DB_ADDR) down
+
+migration: ## Create a new migration
+	@migrate create -ext sql -dir $(MIGRATIONS_PATH) -seq $(filter-out $@,$(MAKECMDGOALS))		
+
+
 # run-tests: ## Run tests 
 # 	cd $(TEST_PATH) && go test .
 # test-cover: ## Run tests with coverage
