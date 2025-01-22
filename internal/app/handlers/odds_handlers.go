@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/Businge931/sba-crud-ops/internal/core/domain"
@@ -19,7 +18,7 @@ func NewOddsHandler(oddsService ports.OddsService) *OddsHandler {
 }
 
 type ErrorResponse struct {
-	Details string `json:"details"`
+	ErrorDetails string `json:"details"`
 }
 
 func (h *OddsHandler) CreateOddsHandler(w http.ResponseWriter, r *http.Request) {
@@ -29,9 +28,8 @@ func (h *OddsHandler) CreateOddsHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req domain.CreateOddsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Details: "invalid request format"})
+	if err := domain.ReadJSON(w, r, &req); err != nil {
+		domain.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -39,16 +37,17 @@ func (h *OddsHandler) CreateOddsHandler(w http.ResponseWriter, r *http.Request) 
 		switch err {
 		case domain.ErrInvalidLeague, domain.ErrEmptyTeams, domain.ErrInvalidOdds,
 			domain.ErrInvalidStartDate, domain.ErrSameTeams, domain.ErrInvalidOddsProbability:
-			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: err.Error()})
+			domain.BadRequestResponse(w, r, err)
 		default:
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: "internal server error"})
+			domain.InternalServerError(w, r, err)
 		}
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	domain.WriteJSON(w, http.StatusCreated, domain.JSONResponse{
+		Error:   false,
+		Message: "odds created successfully",
+	})
 }
 
 func (h *OddsHandler) ReadOddsHandler(w http.ResponseWriter, r *http.Request) {
@@ -58,28 +57,25 @@ func (h *OddsHandler) ReadOddsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req domain.ReadOddsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Details: "invalid request format"})
+	if err := domain.ReadJSON(w, r, &req); err != nil {
+		domain.BadRequestResponse(w, r, err)
 		return
 	}
 
 	odds, err := h.oddsService.ReadOdds(r.Context(), req)
 	if err != nil {
 		switch err {
-		case domain.ErrInvalidLeague, domain.ErrInvalidDateFormat:
-			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: err.Error()})
+		case domain.ErrInvalidLeague:
+			domain.BadRequestResponse(w, r, err)
+		case domain.ErrOddsNotFound:
+			domain.WriteJSONError(w, http.StatusNotFound, err.Error())
 		default:
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: "internal server error"})
+			domain.InternalServerError(w, r, err)
 		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(odds)
+	domain.WriteJSON(w, http.StatusOK, odds)
 }
 
 func (h *OddsHandler) UpdateOddsHandler(w http.ResponseWriter, r *http.Request) {
@@ -89,9 +85,8 @@ func (h *OddsHandler) UpdateOddsHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req domain.CreateOddsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Details: "invalid request format"})
+	if err := domain.ReadJSON(w, r, &req); err != nil {
+		domain.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -99,19 +94,19 @@ func (h *OddsHandler) UpdateOddsHandler(w http.ResponseWriter, r *http.Request) 
 		switch err {
 		case domain.ErrInvalidLeague, domain.ErrEmptyTeams, domain.ErrInvalidOdds,
 			domain.ErrInvalidStartDate, domain.ErrSameTeams, domain.ErrInvalidOddsProbability:
-			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: err.Error()})
+			domain.BadRequestResponse(w, r, err)
 		case domain.ErrOddsNotFound:
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: err.Error()})
+			domain.WriteJSONError(w, http.StatusNotFound, err.Error())
 		default:
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: "internal server error"})
+			domain.InternalServerError(w, r, err)
 		}
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	domain.WriteJSON(w, http.StatusOK, domain.JSONResponse{
+		Error:   false,
+		Message: "odds updated successfully",
+	})
 }
 
 func (h *OddsHandler) DeleteOddsHandler(w http.ResponseWriter, r *http.Request) {
@@ -121,26 +116,25 @@ func (h *OddsHandler) DeleteOddsHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req domain.DeleteOddsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Details: "invalid request format"})
+	if err := domain.ReadJSON(w, r, &req); err != nil {
+		domain.BadRequestResponse(w, r, err)
 		return
 	}
 
 	if err := h.oddsService.DeleteOdds(r.Context(), req); err != nil {
 		switch err {
 		case domain.ErrInvalidLeague:
-			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: err.Error()})
+			domain.BadRequestResponse(w, r, err)
 		case domain.ErrOddsNotFound:
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: err.Error()})
+			domain.WriteJSONError(w, http.StatusNotFound, err.Error())
 		default:
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Details: "internal server error"})
+			domain.InternalServerError(w, r, err)
 		}
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	domain.WriteJSON(w, http.StatusOK, domain.JSONResponse{
+		Error:   false,
+		Message: "odds deleted successfully",
+	})
 }
