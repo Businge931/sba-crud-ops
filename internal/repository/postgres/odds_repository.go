@@ -25,7 +25,7 @@ func (r *oddsRepository) Create(ctx context.Context, odds *domain.Odds) error {
 	query := `
 		INSERT INTO odds (league, home_team, away_team, home_team_win_odds, away_team_win_odds, draw_odds, game_date, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id`
+		RETURNING id, created_at, updated_at`
 
 	err := r.pool.QueryRow(
 		ctx,
@@ -39,7 +39,7 @@ func (r *oddsRepository) Create(ctx context.Context, odds *domain.Odds) error {
 		odds.GameDate,
 		odds.CreatedAt,
 		odds.UpdatedAt,
-	).Scan(&odds.ID)
+	).Scan(&odds.ID, &odds.CreatedAt, &odds.UpdatedAt)
 
 	if err != nil {
 		return err
