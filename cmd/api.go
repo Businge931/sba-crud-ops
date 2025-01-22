@@ -65,8 +65,6 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 		domain.InternalServerError(w, r, err)
 	}
 
-	// w.WriteHeader(http.StatusOK)
-	// w.Write([]byte("OK"))
 }
 
 func (app *application) run(mux http.Handler) error {
