@@ -6,20 +6,31 @@ import (
 
 	"github.com/Businge931/sba-crud-ops/internal/core/domain"
 	"github.com/Businge931/sba-crud-ops/internal/core/ports"
+	"github.com/Businge931/sba-crud-ops/internal/core/validator"
 )
 
+// oddsService implements all the interface methods required by OddsService
 type oddsService struct {
-	repo ports.OddsRepository
+	repo      ports.OddsRepository
+	validator validator.OddsValidator
 }
 
-func NewOddsService(repo ports.OddsRepository) ports.OddsService {
+func NewOddsService(repo ports.OddsRepository, v validator.OddsValidator) ports.OddsService {
+	// If no validator is provided, create a default one
+	if v == nil {
+		v = validator.NewDefaultOddsValidator(nil)
+	}
+
 	return &oddsService{
-		repo: repo,
+		repo:      repo,
+		validator: v,
 	}
 }
 
+// CreateOdds implements OddsCreator interface
 func (s *oddsService) CreateOdds(ctx context.Context, request domain.CreateOddsRequest) error {
-	if err := ValidateOddsRequest(request); err != nil {
+	// Use the validator instead of inline validation
+	if err := s.validator.ValidateCreateRequest(request); err != nil {
 		return err
 	}
 
@@ -38,16 +49,20 @@ func (s *oddsService) CreateOdds(ctx context.Context, request domain.CreateOddsR
 	return s.repo.Create(ctx, odds)
 }
 
+// ReadOdds implements OddsRetriever interface
 func (s *oddsService) ReadOdds(ctx context.Context, request domain.ReadOddsRequest) ([]domain.Odds, error) {
-	if request.League != "English Premier League" {
-		return nil, domain.ErrInvalidLeague
+	// Use the validator instead of hardcoded checks
+	if err := s.validator.ValidateReadRequest(request); err != nil {
+		return nil, err
 	}
 
 	return s.repo.Read(ctx, request.League, request.Date)
 }
 
+// UpdateOdds implements OddsUpdater interface
 func (s *oddsService) UpdateOdds(ctx context.Context, request domain.CreateOddsRequest) error {
-	if err := ValidateOddsRequest(request); err != nil {
+	// Use the validator instead of inline validation
+	if err := s.validator.ValidateUpdateRequest(request); err != nil {
 		return err
 	}
 
@@ -65,9 +80,11 @@ func (s *oddsService) UpdateOdds(ctx context.Context, request domain.CreateOddsR
 	return s.repo.Update(ctx, odds)
 }
 
+// DeleteOdds implements OddsDeleter interface
 func (s *oddsService) DeleteOdds(ctx context.Context, request domain.DeleteOddsRequest) error {
-	if request.League != "English Premier League" {
-		return domain.ErrInvalidLeague
+	// Use the validator instead of hardcoded checks
+	if err := s.validator.ValidateDeleteRequest(request); err != nil {
+		return err
 	}
 
 	return s.repo.Delete(ctx, request.League, request.HomeTeam, request.AwayTeam, request.GameDate)

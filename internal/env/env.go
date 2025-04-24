@@ -10,9 +10,9 @@ func GetString(key, fallback string) string {
 	if !ok {
 		return fallback
 	}
-	
+
 	return val
-	
+
 }
 
 func GetInt(key string, fallback int) int {
