@@ -38,14 +38,27 @@ migration: ## Create a new migration
 	@migrate create -ext sql -dir $(MIGRATIONS_PATH) -seq $(filter-out $@,$(MAKECMDGOALS))		
 
 
-# run-tests: ## Run tests 
-# 	cd $(TEST_PATH) && go test .
-# test-cover: ## Run tests with coverage
-# 	cd $(TEST_PATH) && go test -cover
+test: ## Run all unit tests
+	go test ./internal/...
 
-# test-coverage: ## Run tests and generate coverage profile
-# 	cd $(TEST_PATH) && go test -coverprofile=coverage.out
+test-validator: ## Run validator tests
+	go test ./internal/core/validator
 
-# test-coverage-browser: ## Check the test coverage in the browser
-# 	cd $(TEST_PATH) && go tool cover -html=coverage.out -o /tmp/coverage.html && wslview /tmp/coverage.html
+test-service: ## Run service tests
+	go test ./internal/service
+
+test-grpc: ## Run gRPC API tests
+	go test ./internal/app/grpc
+
+test-integration: ## Run integration tests for repository (requires test database)
+	INTEGRATION_TEST=true go test ./internal/repository/postgres
+
+test-cover: ## Run tests with coverage
+	go test ./internal/... -cover
+
+test-coverage: ## Run tests and generate coverage profile
+	go test ./internal/... -coverprofile=coverage.out
+
+test-coverage-html: ## Generate HTML coverage report
+	go tool cover -html=coverage.out -o coverage.html
 
