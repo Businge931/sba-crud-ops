@@ -16,6 +16,9 @@ deps: ## Fetch required dependencies
 	go mod tidy -compat=1.22
 	go mod download
 
+build: ## Build the application
+	go build -o $(GOBIN)/$(APP) $(MAIN_APP)
+
 run: build ## Build and run program
 	cd $(MAIN_APP) && go run .
 
