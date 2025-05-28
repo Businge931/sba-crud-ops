@@ -6,9 +6,16 @@ import (
 	"time"
 
 	"github.com/Businge931/sba-crud-ops/internal/core/domain"
+	"github.com/Businge931/sba-crud-ops/internal/core/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+type testDependencies struct {
+	repo      *MockOddsRepository
+	validator *MockOddsValidator
+	service   ports.OddsService
+}
 
 // MockOddsRepository is a mock implementation of the OddsRepository interface
 type MockOddsRepository struct {
@@ -61,17 +68,7 @@ func (m *MockOddsValidator) ValidateDeleteRequest(request domain.DeleteOddsReque
 }
 
 func TestCreateOdds(t *testing.T) {
-	// Setup mocks
-	mockRepo := new(MockOddsRepository)
-	mockValidator := new(MockOddsValidator)
-
-	// Create the service with mocks
-	service := NewOddsService(mockRepo, mockValidator)
-
-	// Test context
-	ctx := context.Background()
-
-	// Setup test data
+	// Common test data
 	validRequest := domain.CreateOddsRequest{
 		League:          "English Premier League",
 		HomeTeam:        "Manchester United",
@@ -82,85 +79,103 @@ func TestCreateOdds(t *testing.T) {
 		GameDate:        time.Now().Add(24 * time.Hour),
 	}
 
+	
+
+	type testArgs struct {
+		ctx     context.Context
+		request domain.CreateOddsRequest
+	}
+
 	tests := []struct {
-		name           string
-		request        domain.CreateOddsRequest
-		setupMocks     func()
-		expectedResult error
+		name        string
+		args        testArgs
+		before      func(*testDependencies)
+		after       func(*testing.T, *testDependencies)
+		expectedErr error
 	}{
 		{
-			name:    "Successful creation",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator validates successfully
-				mockValidator.On("ValidateCreateRequest", validRequest).Return(nil)
-
-				// Repository creates successfully
-				// Note: We're not checking exact Odds struct as it has time.Now() fields which are hard to predict
-				mockRepo.On("Create", ctx, mock.AnythingOfType("*domain.Odds")).Return(nil)
+			name: "Successful creation",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: nil,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateCreateRequest", validRequest).Return(nil)
+				d.repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Odds")).Return(nil)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.repo.AssertExpectations(t)
+				d.validator.AssertExpectations(t)
+			},
+			expectedErr: nil,
 		},
 		{
-			name:    "Validation error",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator returns error
-				mockValidator.On("ValidateCreateRequest", validRequest).Return(domain.ErrInvalidLeague)
-				
-				// Repository should not be called
+			name: "Validation error",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: domain.ErrInvalidLeague,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateCreateRequest", validRequest).Return(domain.ErrInvalidLeague)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+			},
+			expectedErr: domain.ErrInvalidLeague,
 		},
 		{
-			name:    "Repository error",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator validates successfully
-				mockValidator.On("ValidateCreateRequest", validRequest).Return(nil)
-
-				// Repository returns error
-				mockRepo.On("Create", ctx, mock.AnythingOfType("*domain.Odds")).Return(domain.ErrInvalidConfiguration)
+			name: "Repository error",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: domain.ErrInvalidConfiguration,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateCreateRequest", validRequest).Return(nil)
+				d.repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Odds")).Return(domain.ErrInvalidConfiguration)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertExpectations(t)
+			},
+			expectedErr: domain.ErrInvalidConfiguration,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset mock expectations and calls
-			mockRepo = new(MockOddsRepository)
-			mockValidator = new(MockOddsValidator)
-			service = NewOddsService(mockRepo, mockValidator)
+			// Initialize dependencies
+			deps := testDependencies{
+				repo:      new(MockOddsRepository),
+				validator: new(MockOddsValidator),
+			}
+			deps.service = NewOddsService(deps.repo, deps.validator)
 
-			// Setup mock expectations
-			tt.setupMocks()
+			// Setup test case
+			if tt.before != nil {
+				tt.before(&deps)
+			}
 
-			// Call the method being tested
-			result := service.CreateOdds(ctx, tt.request)
+			// Execute
+			err := deps.service.CreateOdds(tt.args.ctx, tt.args.request)
 
-			// Assert result
-			assert.Equal(t, tt.expectedResult, result)
+			// Verify results
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
 
-			// Assert all expectations were met (all expected methods were called)
-			mockRepo.AssertExpectations(t)
-			mockValidator.AssertExpectations(t)
+			// Cleanup
+			if tt.after != nil {
+				tt.after(t, &deps)
+			}
 		})
 	}
 }
 
 func TestReadOdds(t *testing.T) {
-	// Setup mocks
-	mockRepo := new(MockOddsRepository)
-	mockValidator := new(MockOddsValidator)
-
-	// Create the service with mocks
-	service := NewOddsService(mockRepo, mockValidator)
-
-	// Test context
-	ctx := context.Background()
-
-	// Setup test data
+	// Common test data
 	validRequest := domain.ReadOddsRequest{
 		League: "English Premier League",
 		Date:   time.Now(),
@@ -181,90 +196,106 @@ func TestReadOdds(t *testing.T) {
 		},
 	}
 
+	type testArgs struct {
+		ctx     context.Context
+		request domain.ReadOddsRequest
+	}
+
 	tests := []struct {
-		name           string
-		request        domain.ReadOddsRequest
-		setupMocks     func()
-		expectedResult []domain.Odds
-		expectedError  error
+		name        string
+		args        testArgs
+		before      func(*testDependencies)
+		after       func(*testing.T, *testDependencies)
+		expected    []domain.Odds
+		expectedErr error
 	}{
 		{
-			name:    "Successful read",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator validates successfully
-				mockValidator.On("ValidateReadRequest", validRequest).Return(nil)
-
-				// Repository reads successfully
-				mockRepo.On("Read", ctx, validRequest.League, validRequest.Date).Return(expectedOdds, nil)
+			name: "Successful read",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: expectedOdds,
-			expectedError:  nil,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateReadRequest", validRequest).Return(nil)
+				d.repo.On("Read", mock.Anything, validRequest.League, validRequest.Date).Return(expectedOdds, nil)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertExpectations(t)
+			},
+			expected:    expectedOdds,
+			expectedErr: nil,
 		},
 		{
-			name:    "Validation error",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator returns error
-				mockValidator.On("ValidateReadRequest", validRequest).Return(domain.ErrInvalidLeague)
-				
-				// Repository should not be called
+			name: "Validation error",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: nil,
-			expectedError:  domain.ErrInvalidLeague,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateReadRequest", validRequest).Return(domain.ErrInvalidLeague)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertNotCalled(t, "Read", mock.Anything, mock.Anything, mock.Anything)
+			},
+			expected:    nil,
+			expectedErr: domain.ErrInvalidLeague,
 		},
 		{
-			name:    "Repository error",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator validates successfully
-				mockValidator.On("ValidateReadRequest", validRequest).Return(nil)
-
-				// Repository returns error
-				mockRepo.On("Read", ctx, validRequest.League, validRequest.Date).Return([]domain.Odds{}, domain.ErrOddsNotFound)
+			name: "Repository error",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: nil,
-			expectedError:  domain.ErrOddsNotFound,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateReadRequest", validRequest).Return(nil)
+				d.repo.On("Read", mock.Anything, validRequest.League, validRequest.Date).Return([]domain.Odds{}, domain.ErrOddsNotFound)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertExpectations(t)
+			},
+			expected:    nil,
+			expectedErr: domain.ErrOddsNotFound,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo = new(MockOddsRepository)
-			mockValidator = new(MockOddsValidator)
-			service = NewOddsService(mockRepo, mockValidator)
+			// Initialize dependencies
+			deps := testDependencies{
+				repo:      new(MockOddsRepository),
+				validator: new(MockOddsValidator),
+			}
+			deps.service = NewOddsService(deps.repo, deps.validator)
 
-			// Setup mock expectations
-			tt.setupMocks()
-
-			// Call the method being tested
-			result, err := service.ReadOdds(ctx, tt.request)
-
-			// Assert result
-			assert.Equal(t, tt.expectedError, err)
-			if tt.expectedError == nil {
-				assert.Equal(t, tt.expectedResult, result)
+			// Setup test case
+			if tt.before != nil {
+				tt.before(&deps)
 			}
 
-			// Assert all expectations were met (all expected methods were called)
-			mockRepo.AssertExpectations(t)
-			mockValidator.AssertExpectations(t)
+			// Execute
+			result, err := deps.service.ReadOdds(tt.args.ctx, tt.args.request)
+
+			// Verify results
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+
+			// Cleanup
+			if tt.after != nil {
+				tt.after(t, &deps)
+			}
 		})
 	}
 }
 
 func TestUpdateOdds(t *testing.T) {
-	// Setup mocks
-	mockRepo := new(MockOddsRepository)
-	mockValidator := new(MockOddsValidator)
-
-	// Create the service with mocks
-	service := NewOddsService(mockRepo, mockValidator)
-
-	// Test context
-	ctx := context.Background()
-
-	// Setup test data
+	// Common test data
 	validRequest := domain.CreateOddsRequest{
 		League:          "English Premier League",
 		HomeTeam:        "Manchester United",
@@ -275,85 +306,122 @@ func TestUpdateOdds(t *testing.T) {
 		GameDate:        time.Now().Add(24 * time.Hour),
 	}
 
+	expectedOdds := &domain.Odds{
+		League:          validRequest.League,
+		HomeTeam:        validRequest.HomeTeam,
+		AwayTeam:        validRequest.AwayTeam,
+		HomeTeamWinOdds: validRequest.HomeTeamWinOdds,
+		AwayTeamWinOdds: validRequest.AwayTeamWinOdds,
+		DrawOdds:        validRequest.DrawOdds,
+		GameDate:        validRequest.GameDate,
+	}
+
+	type testArgs struct {
+		ctx     context.Context
+		request domain.CreateOddsRequest
+	}
+
 	tests := []struct {
-		name           string
-		request        domain.CreateOddsRequest
-		setupMocks     func()
-		expectedResult error
+		name        string
+		args        testArgs
+		before      func(*testDependencies)
+		after       func(*testing.T, *testDependencies)
+		expected    *domain.Odds
+		expectedErr error
 	}{
 		{
-			name:    "Successful update",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator validates successfully
-				mockValidator.On("ValidateUpdateRequest", validRequest).Return(nil)
-
-				// Repository updates successfully
-				mockRepo.On("Update", ctx, mock.AnythingOfType("*domain.Odds")).Return(nil)
+			name: "Successful update",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: nil,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateUpdateRequest", validRequest).Return(nil)
+				d.repo.On("Update", mock.Anything, mock.MatchedBy(func(odds *domain.Odds) bool {
+					return odds.League == validRequest.League &&
+						odds.HomeTeam == validRequest.HomeTeam &&
+						odds.AwayTeam == validRequest.AwayTeam &&
+						odds.HomeTeamWinOdds == validRequest.HomeTeamWinOdds &&
+						odds.AwayTeamWinOdds == validRequest.AwayTeamWinOdds &&
+						odds.DrawOdds == validRequest.DrawOdds
+				})).Return(nil)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertExpectations(t)
+			},
+			expected:    expectedOdds,
+			expectedErr: nil,
 		},
 		{
-			name:    "Validation error",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator returns error
-				mockValidator.On("ValidateUpdateRequest", validRequest).Return(domain.ErrInvalidLeague)
-				
-				// Repository should not be called
+			name: "Validation error",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: domain.ErrInvalidLeague,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateUpdateRequest", validRequest).Return(domain.ErrInvalidLeague)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+			},
+			expected:    nil,
+			expectedErr: domain.ErrInvalidLeague,
 		},
 		{
-			name:    "Repository error",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator validates successfully
-				mockValidator.On("ValidateUpdateRequest", validRequest).Return(nil)
-
-				// Repository returns error
-				mockRepo.On("Update", ctx, mock.AnythingOfType("*domain.Odds")).Return(domain.ErrOddsNotFound)
+			name: "Repository error",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: domain.ErrOddsNotFound,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateUpdateRequest", validRequest).Return(nil)
+				d.repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Odds")).Return(domain.ErrOddsNotFound)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertExpectations(t)
+			},
+			expected:    nil,
+			expectedErr: domain.ErrOddsNotFound,
 		},
 	}
 
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset mock expectations and calls
-			mockRepo = new(MockOddsRepository)
-			mockValidator = new(MockOddsValidator)
-			service = NewOddsService(mockRepo, mockValidator)
+			// Initialize dependencies
+			deps := testDependencies{
+				repo:      new(MockOddsRepository),
+				validator: new(MockOddsValidator),
+			}
+			deps.service = NewOddsService(deps.repo, deps.validator)
 
-			// Setup mock expectations
-			tt.setupMocks()
+			// Setup test case
+			if tt.before != nil {
+				tt.before(&deps)
+			}
 
-			// Call the method being tested
-			result := service.UpdateOdds(ctx, tt.request)
+			// Execute
+			err := deps.service.UpdateOdds(tt.args.ctx, tt.args.request)
 
-			// Assert result
-			assert.Equal(t, tt.expectedResult, result)
+			// Verify results
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
 
-			// Assert all expectations were met (all expected methods were called)
-			mockRepo.AssertExpectations(t)
-			mockValidator.AssertExpectations(t)
+			// Cleanup
+			if tt.after != nil {
+				tt.after(t, &deps)
+			}
 		})
 	}
 }
 
 func TestDeleteOdds(t *testing.T) {
-	// Setup mocks
-	mockRepo := new(MockOddsRepository)
-	mockValidator := new(MockOddsValidator)
-
-	// Create the service with mocks
-	service := NewOddsService(mockRepo, mockValidator)
-
-	// Test context
-	ctx := context.Background()
-
-	// Setup test data
+	// Common test data
 	gameDate := time.Now().Add(24 * time.Hour)
 	validRequest := domain.DeleteOddsRequest{
 		League:   "English Premier League",
@@ -362,67 +430,95 @@ func TestDeleteOdds(t *testing.T) {
 		GameDate: gameDate,
 	}
 
+	type testArgs struct {
+		ctx     context.Context
+		request domain.DeleteOddsRequest
+	}
+
 	tests := []struct {
-		name           string
-		request        domain.DeleteOddsRequest
-		setupMocks     func()
-		expectedResult error
+		name        string
+		args        testArgs
+		before      func(*testDependencies)
+		after       func(*testing.T, *testDependencies)
+		expectedErr error
 	}{
 		{
-			name:    "Successful delete",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator validates successfully
-				mockValidator.On("ValidateDeleteRequest", validRequest).Return(nil)
-
-				// Repository deletes successfully
-				mockRepo.On("Delete", ctx, validRequest.League, validRequest.HomeTeam, validRequest.AwayTeam, validRequest.GameDate).Return(nil)
+			name: "Successful delete",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: nil,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateDeleteRequest", validRequest).Return(nil)
+				d.repo.On("Delete", mock.Anything, validRequest.League, validRequest.HomeTeam, validRequest.AwayTeam, validRequest.GameDate).Return(nil)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertExpectations(t)
+			},
+			expectedErr: nil,
 		},
 		{
-			name:    "Validation error",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator returns error
-				mockValidator.On("ValidateDeleteRequest", validRequest).Return(domain.ErrInvalidLeague)
-				
-				// Repository should not be called
+			name: "Validation error",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: domain.ErrInvalidLeague,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateDeleteRequest", validRequest).Return(domain.ErrInvalidLeague)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			},
+			expectedErr: domain.ErrInvalidLeague,
 		},
 		{
-			name:    "Repository error",
-			request: validRequest,
-			setupMocks: func() {
-				// Validator validates successfully
-				mockValidator.On("ValidateDeleteRequest", validRequest).Return(nil)
-
-				// Repository returns error
-				mockRepo.On("Delete", ctx, validRequest.League, validRequest.HomeTeam, validRequest.AwayTeam, validRequest.GameDate).Return(domain.ErrOddsNotFound)
+			name: "Repository error",
+			args: testArgs{
+				ctx:     context.Background(),
+				request: validRequest,
 			},
-			expectedResult: domain.ErrOddsNotFound,
+			before: func(d *testDependencies) {
+				d.validator.On("ValidateDeleteRequest", validRequest).Return(nil)
+				d.repo.On("Delete", mock.Anything, validRequest.League, validRequest.HomeTeam, validRequest.AwayTeam, validRequest.GameDate).Return(domain.ErrOddsNotFound)
+			},
+			after: func(t *testing.T, d *testDependencies) {
+				d.validator.AssertExpectations(t)
+				d.repo.AssertExpectations(t)
+			},
+			expectedErr: domain.ErrOddsNotFound,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo = new(MockOddsRepository)
-			mockValidator = new(MockOddsValidator)
-			service = NewOddsService(mockRepo, mockValidator)
+			// Initialize dependencies
+			deps := testDependencies{
+				repo:      new(MockOddsRepository),
+				validator: new(MockOddsValidator),
+			}
+			deps.service = NewOddsService(deps.repo, deps.validator)
 
-			// Setup mock expectations
-			tt.setupMocks()
+			// Setup test case
+			if tt.before != nil {
+				tt.before(&deps)
+			}
 
-			// Call the method being tested
-			result := service.DeleteOdds(ctx, tt.request)
+			// Execute
+			err := deps.service.DeleteOdds(tt.args.ctx, tt.args.request)
 
-			// Assert result
-			assert.Equal(t, tt.expectedResult, result)
+			// Verify results
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
 
-			// Assert all expectations were met (all expected methods were called)
-			mockRepo.AssertExpectations(t)
-			mockValidator.AssertExpectations(t)
+			// Cleanup
+			if tt.after != nil {
+				tt.after(t, &deps)
+			}
 		})
 	}
 }
