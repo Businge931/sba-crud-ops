@@ -41,7 +41,6 @@ func TestOddsRepository(t *testing.T) {
 	awayTeam := "Liverpool"
 	gameDate := time.Now().Truncate(24 * time.Hour).Add(24 * time.Hour) // Tomorrow at midnight
 
-	// Test cases
 	tests := []struct {
 		name        string
 		setup       func(*testing.T, *oddsRepository) *domain.Odds
