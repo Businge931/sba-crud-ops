@@ -51,5 +51,9 @@ func LoadConfig() *Config {
 
 // NewLeagueRegistry creates and configures the league registry
 func NewLeagueRegistry(cfg *Config) config.LeagueRegistry {
+	if cfg == nil {
+		// Return a default registry with no supported leagues if config is nil
+		return config.NewLeagueRegistry(nil)
+	}
 	return config.NewLeagueRegistry(cfg.SupportedLeagues)
 }
