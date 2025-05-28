@@ -29,8 +29,10 @@ func SetupServer(cfg *Config, components *ApplicationComponents) *Server {
 	// Initialize gRPC server
 	server := grpc.NewServer()
 
-	// Register odds service
-	oddsServer := grpcServer.NewOddsServer(components.OddsService)
+	// Register odds service with improved implementation
+	oddsServer := grpcServer.NewImprovedOddsServer(
+		components.OddsService,
+	)
 	proto.RegisterOddsServiceServer(server, oddsServer)
 
 	// Add health check service
