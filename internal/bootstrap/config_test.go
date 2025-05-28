@@ -1,7 +1,9 @@
 package bootstrap
 
 import (
+	"os"
 	"testing"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,14 +19,14 @@ func TestLoadConfig(t *testing.T) {
 		expectedErr    bool
 	}{
 		{
-			name: "default values",
+			name:    "default values",
 			envVars: map[string]string{},
 			expectedConfig: &Config{
-				ServicePort: "50052",
-				ServiceName: "odds-service",
-				Version:     "0.0.1",
-				GatewayAddr: "localhost:8080",
-				DBAddr:      "postgresql://admin:adminpassword@localhost:5433/sba_crud_ops?sslmode=disable",
+				ServicePort:  "50052",
+				ServiceName:  "odds-service",
+				Version:      "0.0.1",
+				GatewayAddr:  "localhost:8080",
+				DBAddr:       "postgresql://admin:adminpassword@localhost:5433/sba_crud_ops?sslmode=disable",
 				MaxOpenConns: 30,
 				MaxIdleConns: 30,
 				MaxIdleTime:  "15m",
@@ -50,11 +52,11 @@ func TestLoadConfig(t *testing.T) {
 				"DB_MAX_IDLE_TIME":  "10m",
 			},
 			expectedConfig: &Config{
-				ServicePort: "8080",
-				ServiceName: "test-service",
-				Version:     "1.0.0",
-				GatewayAddr: "gateway:9090",
-				DBAddr:      "postgresql://user:pass@localhost:5432/testdb",
+				ServicePort:  "8080",
+				ServiceName:  "test-service",
+				Version:      "1.0.0",
+				GatewayAddr:  "gateway:9090",
+				DBAddr:       "postgresql://user:pass@localhost:5432/testdb",
 				MaxOpenConns: 50,
 				MaxIdleConns: 25,
 				MaxIdleTime:  "10m",
@@ -81,5 +83,43 @@ func TestLoadConfig(t *testing.T) {
 			// Verify
 			assertConfigEqual(t, tt.expectedConfig, config)
 		})
+	}
+}
+
+// assertConfigEqual is a helper to assert config fields
+func assertConfigEqual(t *testing.T, expected, actual *Config) {
+	t.Helper()
+	assert.Equal(t, expected.ServicePort, actual.ServicePort)
+	assert.Equal(t, expected.ServiceName, actual.ServiceName)
+	assert.Equal(t, expected.Version, actual.Version)
+	assert.Equal(t, expected.GatewayAddr, actual.GatewayAddr)
+	assert.Equal(t, expected.DBAddr, actual.DBAddr)
+	assert.Equal(t, expected.MaxOpenConns, actual.MaxOpenConns)
+	assert.Equal(t, expected.MaxIdleConns, actual.MaxIdleConns)
+	assert.Equal(t, expected.MaxIdleTime, actual.MaxIdleTime)
+	assert.ElementsMatch(t, expected.SupportedLeagues, actual.SupportedLeagues)
+}
+
+func resetEnvVars() {
+	envVars := []string{
+		"SERVICE_PORT",
+		"SERVICE_NAME",
+		"VERSION",
+		"GATEWAY_ADDR",
+		"DB_ADDR",
+		"DB_MAX_OPEN_CONNS",
+		"DB_MAX_IDLE_CONNS",
+		"DB_MAX_IDLE_TIME",
+	}
+
+	for _, v := range envVars {
+		os.Unsetenv(v)
+	}
+}
+
+func setEnvVars(t *testing.T, envs map[string]string) {
+	t.Helper()
+	for k, v := range envs {
+		t.Setenv(k, v)
 	}
 }
