@@ -20,7 +20,7 @@ func TestOddsRepository(t *testing.T) {
 		t.Skip("Skipping integration test. Set INTEGRATION_TEST=true to run")
 	}
 
-	// Get database connection
+	// Setup test database
 	pool, err := setupTestDB()
 	require.NoError(t, err, "Failed to setup test database")
 	defer pool.Close()
@@ -32,72 +32,167 @@ func TestOddsRepository(t *testing.T) {
 	// Create repository
 	repo := NewOddsRepository(pool)
 
-	// Setup test context
+	// Test context
 	ctx := context.Background()
 
-	// Test data
+	// Common test data
 	league := "English Premier League"
 	homeTeam := "Manchester United"
 	awayTeam := "Liverpool"
 	gameDate := time.Now().Truncate(24 * time.Hour).Add(24 * time.Hour) // Tomorrow at midnight
-	
-	// Create test odds
-	odds := &domain.Odds{
-		League:          league,
-		HomeTeam:        homeTeam,
-		AwayTeam:        awayTeam,
-		HomeTeamWinOdds: 2.5,
-		AwayTeamWinOdds: 2.1,
-		DrawOdds:        3.0,
-		GameDate:        gameDate,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
+
+	// Test cases
+	tests := []struct {
+		name        string
+		setup       func(*testing.T, *oddsRepository) *domain.Odds
+		action      func(*testing.T, context.Context, *oddsRepository, *domain.Odds) error
+		verify      func(*testing.T, context.Context, *oddsRepository, *domain.Odds, error)
+		cleanup     func(*testing.T, context.Context, *oddsRepository, *domain.Odds)
+		shouldClean bool
+	}{
+		{
+			name: "Create odds",
+			setup: func(t *testing.T, _ *oddsRepository) *domain.Odds {
+				return &domain.Odds{
+					League:          league,
+					HomeTeam:        homeTeam,
+					AwayTeam:        awayTeam,
+					HomeTeamWinOdds: 2.5,
+					AwayTeamWinOdds: 2.1,
+					DrawOdds:        3.0,
+					GameDate:        gameDate,
+					CreatedAt:       time.Now(),
+					UpdatedAt:       time.Now(),
+				}
+			},
+			action: func(t *testing.T, ctx context.Context, r *oddsRepository, o *domain.Odds) error {
+				return r.Create(ctx, o)
+			},
+			verify: func(t *testing.T, ctx context.Context, r *oddsRepository, o *domain.Odds, err error) {
+				assert.NoError(t, err, "Failed to create odds")
+				assert.NotZero(t, o.ID, "Expected odds ID to be set after creation")
+
+				// Verify the odds were created
+				result, err := r.Read(ctx, o.League, o.GameDate)
+				require.NoError(t, err, "Failed to read created odds")
+				require.NotEmpty(t, result, "Expected to find created odds")
+				assert.Equal(t, o.HomeTeam, result[0].HomeTeam, "Home team doesn't match")
+				assert.Equal(t, o.AwayTeam, result[0].AwayTeam, "Away team doesn't match")
+			},
+			shouldClean: true,
+		},
+		{
+			name: "Read odds",
+			setup: func(t *testing.T, r *oddsRepository) *domain.Odds {
+				o := &domain.Odds{
+					League:          league,
+					HomeTeam:        homeTeam,
+					AwayTeam:        awayTeam,
+					HomeTeamWinOdds: 2.5,
+					AwayTeamWinOdds: 2.1,
+					DrawOdds:        3.0,
+					GameDate:        gameDate,
+				}
+				require.NoError(t, r.Create(ctx, o), "Failed to setup test odds")
+				return o
+			},
+			action: func(t *testing.T, ctx context.Context, r *oddsRepository, o *domain.Odds) error {
+				_, err := r.Read(ctx, o.League, o.GameDate)
+				return err
+			},
+			verify: func(t *testing.T, ctx context.Context, r *oddsRepository, o *domain.Odds, err error) {
+				assert.NoError(t, err, "Failed to read odds")
+				result, err := r.Read(ctx, o.League, o.GameDate)
+				require.NoError(t, err, "Failed to read odds in verification")
+				assert.NotEmpty(t, result, "Expected to find odds")
+				assert.Equal(t, o.HomeTeam, result[0].HomeTeam, "Home team doesn't match")
+				assert.Equal(t, o.AwayTeam, result[0].AwayTeam, "Away team doesn't match")
+			},
+			shouldClean: true,
+		},
+		{
+			name: "Update odds",
+			setup: func(t *testing.T, r *oddsRepository) *domain.Odds {
+				o := &domain.Odds{
+					League:          league,
+					HomeTeam:        homeTeam,
+					AwayTeam:        awayTeam,
+					HomeTeamWinOdds: 2.5,
+					AwayTeamWinOdds: 2.1,
+					DrawOdds:        3.0,
+					GameDate:        gameDate,
+				}
+				require.NoError(t, r.Create(ctx, o), "Failed to setup test odds")
+				return o
+			},
+			action: func(t *testing.T, ctx context.Context, r *oddsRepository, o *domain.Odds) error {
+				o.HomeTeamWinOdds = 3.0
+				o.AwayTeamWinOdds = 2.5
+				o.DrawOdds = 3.5
+				return r.Update(ctx, o)
+			},
+			verify: func(t *testing.T, ctx context.Context, r *oddsRepository, o *domain.Odds, err error) {
+				assert.NoError(t, err, "Failed to update odds")
+				result, err := r.Read(ctx, o.League, o.GameDate)
+				require.NoError(t, err, "Failed to read updated odds")
+				require.NotEmpty(t, result, "No odds returned after update")
+				assert.Equal(t, 3.0, result[0].HomeTeamWinOdds, "Home team odds not updated")
+				assert.Equal(t, 2.5, result[0].AwayTeamWinOdds, "Away team odds not updated")
+				assert.Equal(t, 3.5, result[0].DrawOdds, "Draw odds not updated")
+			},
+			shouldClean: true,
+		},
+		{
+			name: "Delete odds",
+			setup: func(t *testing.T, r *oddsRepository) *domain.Odds {
+				o := &domain.Odds{
+					League:          league,
+					HomeTeam:        homeTeam,
+					AwayTeam:        awayTeam,
+					HomeTeamWinOdds: 2.5,
+					AwayTeamWinOdds: 2.1,
+					DrawOdds:        3.0,
+					GameDate:        gameDate,
+				}
+				require.NoError(t, r.Create(ctx, o), "Failed to setup test odds")
+				return o
+			},
+			action: func(t *testing.T, ctx context.Context, r *oddsRepository, o *domain.Odds) error {
+				return r.Delete(ctx, o.League, o.HomeTeam, o.AwayTeam, o.GameDate)
+			},
+			verify: func(t *testing.T, ctx context.Context, r *oddsRepository, o *domain.Odds, err error) {
+				assert.NoError(t, err, "Failed to delete odds")
+				result, err := r.Read(ctx, o.League, o.GameDate)
+				require.NoError(t, err, "Error when reading after delete")
+				assert.Empty(t, result, "Odds still present after delete")
+			},
+			shouldClean: false, // Already cleaned up by the action
+		},
 	}
 
-	// Test Create
-	t.Run("Create", func(t *testing.T) {
-		err := repo.Create(ctx, odds)
-		assert.NoError(t, err, "Failed to create odds")
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset the test table for each test case
+			err := createTestTable(pool)
+			require.NoError(t, err, "Failed to reset test table")
 
-	// Test Read 
-	t.Run("Read", func(t *testing.T) {
-		result, err := repo.Read(ctx, league, gameDate)
-		assert.NoError(t, err, "Failed to read odds")
-		assert.NotEmpty(t, result, "No odds returned")
-		assert.Equal(t, homeTeam, result[0].HomeTeam, "Home team doesn't match")
-		assert.Equal(t, awayTeam, result[0].AwayTeam, "Away team doesn't match")
-	})
+			// Setup test case
+			o := tt.setup(t, repo.(*oddsRepository))
 
-	// Test Update
-	t.Run("Update", func(t *testing.T) {
-		// Modify odds
-		odds.HomeTeamWinOdds = 3.0
-		odds.AwayTeamWinOdds = 2.5
-		odds.DrawOdds = 3.5
+			// Execute the action
+			err = tt.action(t, ctx, repo.(*oddsRepository), o)
 
-		err := repo.Update(ctx, odds)
-		assert.NoError(t, err, "Failed to update odds")
+			// Verify the results
+			if tt.verify != nil {
+				tt.verify(t, ctx, repo.(*oddsRepository), o, err)
+			}
 
-		// Read back to verify
-		result, err := repo.Read(ctx, league, gameDate)
-		assert.NoError(t, err, "Failed to read updated odds")
-		assert.NotEmpty(t, result, "No odds returned after update")
-		assert.Equal(t, 3.0, result[0].HomeTeamWinOdds, "Home team odds not updated")
-		assert.Equal(t, 2.5, result[0].AwayTeamWinOdds, "Away team odds not updated")
-		assert.Equal(t, 3.5, result[0].DrawOdds, "Draw odds not updated")
-	})
-
-	// Test Delete
-	t.Run("Delete", func(t *testing.T) {
-		err := repo.Delete(ctx, league, homeTeam, awayTeam, gameDate)
-		assert.NoError(t, err, "Failed to delete odds")
-
-		// Verify it's gone
-		result, err := repo.Read(ctx, league, gameDate)
-		assert.NoError(t, err, "Error when reading after delete")
-		assert.Empty(t, result, "Odds still present after delete")
-	})
+			// Cleanup if needed
+			if tt.shouldClean && tt.cleanup != nil {
+				tt.cleanup(t, ctx, repo.(*oddsRepository), o)
+			}
+		})
+	}
 }
 
 // Helper function to setup a test database connection
