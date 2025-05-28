@@ -7,26 +7,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestNewLeagueRegistry tests the NewLeagueRegistry function
 func TestNewLeagueRegistry(t *testing.T) {
 	tests := []struct {
-		name           string
-		initialLeagues []string
+		name            string
+		initialLeagues  []string
 		expectedLeagues []string
 	}{
 		{
-			name:           "no initial leagues",
-			initialLeagues: nil,
+			name:            "no initial leagues",
+			initialLeagues:  nil,
 			expectedLeagues: []string{"English Premier League"},
 		},
 		{
-			name:           "with initial leagues",
-			initialLeagues: []string{"La Liga", "Bundesliga"},
+			name:            "with initial leagues",
+			initialLeagues:  []string{"La Liga", "Bundesliga"},
 			expectedLeagues: []string{"La Liga", "Bundesliga"},
 		},
 		{
-			name:           "empty initial leagues",
-			initialLeagues: []string{},
+			name:            "empty initial leagues",
+			initialLeagues:  []string{},
 			expectedLeagues: []string{"English Premier League"},
 		},
 	}
@@ -45,7 +44,6 @@ func TestNewLeagueRegistry(t *testing.T) {
 	}
 }
 
-// TestIsSupported tests the IsSupported method
 func TestIsSupported(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -88,14 +86,12 @@ func TestIsSupported(t *testing.T) {
 			// Execute
 			result := r.IsSupported(tt.league)
 
-			
 			// Verify
 			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
 }
 
-// TestRegisterLeague tests the RegisterLeague method
 func TestRegisterLeague(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -153,7 +149,6 @@ func TestRegisterLeague(t *testing.T) {
 	}
 }
 
-// TestUnregisterLeague tests the UnregisterLeague method
 func TestUnregisterLeague(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -211,7 +206,6 @@ func TestUnregisterLeague(t *testing.T) {
 	}
 }
 
-// TestConcurrentAccess tests concurrent access to the registry
 func TestConcurrentAccess(t *testing.T) {
 	r := NewLeagueRegistry([]string{"La Liga"})
 
