@@ -79,8 +79,6 @@ func TestCreateOdds(t *testing.T) {
 		GameDate:        time.Now().Add(24 * time.Hour),
 	}
 
-	
-
 	type testArgs struct {
 		ctx     context.Context
 		request domain.CreateOddsRequest
