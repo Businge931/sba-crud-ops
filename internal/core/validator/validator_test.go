@@ -1,13 +1,24 @@
 package validator
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/Businge931/sba-crud-ops/internal/core/domain"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/mock"
 )
+
+// assertError checks if the error contains the expected error message
+func assertError(t *testing.T, err error, wantErr error) {
+	if wantErr != nil {
+		require.Error(t, err)
+		require.Contains(t, err.Error(), wantErr.Error())
+	} else {
+		require.NoError(t, err)
+	}
+}
 
 // MockLeagueRegistry is a mock implementation of the LeagueRegistry interface
 type MockLeagueRegistry struct {
@@ -77,7 +88,7 @@ func TestValidateCreateRequest(t *testing.T) {
 				DrawOdds:        3.0,
 				GameDate:        time.Now().Add(24 * time.Hour), // Tomorrow
 			},
-			wantErr: domain.ErrInvalidLeague,
+			wantErr: errors.New("league: unsupported league: Invalid League."),
 		},
 		{
 			name: "Empty home team",
@@ -90,7 +101,7 @@ func TestValidateCreateRequest(t *testing.T) {
 				DrawOdds:        3.0,
 				GameDate:        time.Now().Add(24 * time.Hour),
 			},
-			wantErr: domain.ErrEmptyTeamName,
+			wantErr: errors.New("home_team: home team is required."),
 		},
 		{
 			name: "Empty away team",
@@ -103,7 +114,7 @@ func TestValidateCreateRequest(t *testing.T) {
 				DrawOdds:        3.0,
 				GameDate:        time.Now().Add(24 * time.Hour),
 			},
-			wantErr: domain.ErrEmptyTeamName,
+			wantErr: errors.New("away_team: away team is required."),
 		},
 		{
 			name: "Invalid home team odds",
@@ -155,7 +166,7 @@ func TestValidateCreateRequest(t *testing.T) {
 				DrawOdds:        3.0,
 				GameDate:        time.Time{}, // Zero time
 			},
-			wantErr: domain.ErrEmptyGameDate,
+			wantErr: errors.New("game_date: game date is required."),
 		},
 	}
 
@@ -163,11 +174,7 @@ func TestValidateCreateRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateCreateRequest(tt.request)
-			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
+			assertError(t, err, tt.wantErr)
 		})
 	}
 }
@@ -200,7 +207,7 @@ func TestValidateReadRequest(t *testing.T) {
 				League: "Invalid League",
 				Date:   time.Now(),
 			},
-			wantErr: domain.ErrInvalidLeague,
+			wantErr: errors.New("league: unsupported league: Invalid League."),
 		},
 		{
 			name: "Empty date",
@@ -208,7 +215,7 @@ func TestValidateReadRequest(t *testing.T) {
 				League: "English Premier League",
 				Date:   time.Time{}, // Zero time
 			},
-			wantErr: domain.ErrEmptyDate,
+			wantErr: errors.New("date: date is required."),
 		},
 	}
 
@@ -216,11 +223,7 @@ func TestValidateReadRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateReadRequest(tt.request)
-			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
+			assertError(t, err, tt.wantErr)
 		})
 	}
 }
@@ -257,7 +260,7 @@ func TestValidateDeleteRequest(t *testing.T) {
 				AwayTeam: "Liverpool",
 				GameDate: time.Now(),
 			},
-			wantErr: domain.ErrInvalidLeague,
+			wantErr: errors.New("league: unsupported league: Invalid League."),
 		},
 		{
 			name: "Empty home team",
@@ -267,7 +270,7 @@ func TestValidateDeleteRequest(t *testing.T) {
 				AwayTeam: "Liverpool",
 				GameDate: time.Now(),
 			},
-			wantErr: domain.ErrEmptyTeamName,
+			wantErr: errors.New("home_team: home team is required."),
 		},
 		{
 			name: "Empty away team",
@@ -277,7 +280,7 @@ func TestValidateDeleteRequest(t *testing.T) {
 				AwayTeam: "",
 				GameDate: time.Now(),
 			},
-			wantErr: domain.ErrEmptyTeamName,
+			wantErr: errors.New("away_team: away team is required."),
 		},
 		{
 			name: "Empty game date",
@@ -287,7 +290,7 @@ func TestValidateDeleteRequest(t *testing.T) {
 				AwayTeam: "Liverpool",
 				GameDate: time.Time{}, // Zero time
 			},
-			wantErr: domain.ErrEmptyGameDate,
+			wantErr: errors.New("game_date: game date is required."),
 		},
 	}
 
@@ -295,11 +298,7 @@ func TestValidateDeleteRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateDeleteRequest(tt.request)
-			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
+			assertError(t, err, tt.wantErr)
 		})
 	}
 }
@@ -342,7 +341,7 @@ func TestValidateUpdateRequest(t *testing.T) {
 				DrawOdds:        3.0,
 				GameDate:        time.Now().Add(24 * time.Hour),
 			},
-			wantErr: domain.ErrInvalidLeague,
+			wantErr: errors.New("league: unsupported league: Invalid League."),
 		},
 		{
 			name: "Updated invalid odds",
@@ -355,7 +354,7 @@ func TestValidateUpdateRequest(t *testing.T) {
 				DrawOdds:        3.0,
 				GameDate:        time.Now().Add(24 * time.Hour),
 			},
-			wantErr: domain.ErrInvalidOddsValue,
+			wantErr: errors.New("home_team_win_odds: odds must be greater than 1.0."),
 		},
 	}
 
@@ -363,11 +362,7 @@ func TestValidateUpdateRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateUpdateRequest(tt.request)
-			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
+			assertError(t, err, tt.wantErr)
 		})
 	}
 }

@@ -1,12 +1,13 @@
 package validator
 
 import (
-	"fmt"
 	"regexp"
 	"time"
 
-	"github.com/Businge931/sba-crud-ops/internal/core/config"
 	"github.com/Businge931/sba-crud-ops/internal/core/domain"
+	registry "github.com/Businge931/sba-crud-ops/internal/core/registry"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/pkg/errors"
 )
 
 // OddsValidator defines the interface for validating odds-related requests
@@ -19,14 +20,14 @@ type OddsValidator interface {
 
 // DefaultOddsValidator implements the OddsValidator interface with default validation logic
 type DefaultOddsValidator struct {
-	leagueRegistry config.LeagueRegistry
+	leagueRegistry registry.LeagueRegistry
 }
 
 // NewDefaultOddsValidator creates a new instance of DefaultOddsValidator
-func NewDefaultOddsValidator(leagueRegistry config.LeagueRegistry) *DefaultOddsValidator {
+func NewDefaultOddsValidator(leagueRegistry registry.LeagueRegistry) *DefaultOddsValidator {
 	// If no registry is provided, create a default one
 	if leagueRegistry == nil {
-		leagueRegistry = config.NewLeagueRegistry(nil) // Uses default of English Premier League
+		leagueRegistry = registry.NewLeagueRegistry(nil) // Uses default of English Premier League
 	}
 
 	return &DefaultOddsValidator{
@@ -34,133 +35,107 @@ func NewDefaultOddsValidator(leagueRegistry config.LeagueRegistry) *DefaultOddsV
 	}
 }
 
-// ValidateCreateRequest validates a create odds request
+// validateLeagueRegistry validates if the league registry is properly initialized
+func (validator *DefaultOddsValidator) validateLeagueRegistry() error {
+	if validator.leagueRegistry == nil {
+		return errors.New("league registry is not initialized")
+	}
+	return nil
+}
+
+// ValidateCreateRequest validates a create odds request using ozzo-validation
 func (validator *DefaultOddsValidator) ValidateCreateRequest(request domain.CreateOddsRequest) error {
-	// Validate league
-	if err := validator.validateLeague(request.League); err != nil {
-		return err
-	}
+	err := validation.ValidateStruct(&request,
+		validation.Field(&request.League,
+			validation.Required.Error("league is required"),
+			validation.By(validator.validateLeague)),
+		validation.Field(&request.HomeTeam,
+			validation.Required.Error("home team is required"),
+			validation.Match(regexp.MustCompile(`^[A-Za-z0-9\s\-]+$`)).Error("invalid team name format")),
+		validation.Field(&request.AwayTeam,
+			validation.Required.Error("away team is required"),
+			validation.Match(regexp.MustCompile(`^[A-Za-z0-9\s\-]+$`)).Error("invalid team name format")),
+		validation.Field(&request.HomeTeamWinOdds,
+			validation.Required.Error("home team win odds are required"),
+			validation.Min(1.0).Exclusive().Error("odds must be greater than 1.0")),
+		validation.Field(&request.AwayTeamWinOdds,
+			validation.Required.Error("away team win odds are required"),
+			validation.Min(1.0).Exclusive().Error("odds must be greater than 1.0")),
+		validation.Field(&request.DrawOdds,
+			validation.Required.Error("draw odds are required"),
+			validation.Min(1.0).Exclusive().Error("odds must be greater than 1.0")),
+		validation.Field(&request.GameDate,
+			validation.Required.Error("game date is required"),
+			validation.Min(time.Now().Add(-24*time.Hour)).Error("game date cannot be in the past")),
+	)
 
-	// Validate team names
-	if err := validator.validateTeam(request.HomeTeam); err != nil {
-		return fmt.Errorf("invalid home team: %w", err)
-	}
-
-	if err := validator.validateTeam(request.AwayTeam); err != nil {
-		return fmt.Errorf("invalid away team: %w", err)
-	}
-
-	// Validate odds values
-	if err := validator.validateOddsValue(request.HomeTeamWinOdds); err != nil {
-		return fmt.Errorf("invalid home team win odds: %w", err)
-	}
-
-	if err := validator.validateOddsValue(request.AwayTeamWinOdds); err != nil {
-		return fmt.Errorf("invalid away team win odds: %w", err)
-	}
-
-	if err := validator.validateOddsValue(request.DrawOdds); err != nil {
-		return fmt.Errorf("invalid draw odds: %w", err)
-	}
-
-	// Validate game date
-	if err := validator.validateGameDate(request.GameDate); err != nil {
-		return err
+	if err != nil {
+		return errors.Wrap(err, "validation failed")
 	}
 
 	return nil
 }
 
-// ValidateReadRequest validates a read odds request
+// ValidateReadRequest validates a read odds request using ozzo-validation
 func (validator *DefaultOddsValidator) ValidateReadRequest(request domain.ReadOddsRequest) error {
-	// Validate league
-	if err := validator.validateLeague(request.League); err != nil {
-		return err
-	}
+	err := validation.ValidateStruct(&request,
+		validation.Field(&request.League,
+			validation.Required.Error("league is required"),
+			validation.By(validator.validateLeague)),
+		validation.Field(&request.Date,
+			validation.Required.Error("date is required")),
+	)
 
-	// Validate date (optional extra validation can be added)
-	if request.Date.IsZero() {
-		return domain.ErrEmptyDate
+	if err != nil {
+		return errors.Wrap(err, "validation failed")
 	}
 
 	return nil
 }
 
-// ValidateUpdateRequest validates an update odds request
+// ValidateUpdateRequest validates an update odds request using ozzo-validation
 func (validator *DefaultOddsValidator) ValidateUpdateRequest(request domain.CreateOddsRequest) error {
-	// Reuse create validation since they're similar
+	// Reuse create validation since they have the same structure
 	return validator.ValidateCreateRequest(request)
 }
 
-// ValidateDeleteRequest validates a delete odds request
+// ValidateDeleteRequest validates a delete odds request using ozzo-validation
 func (validator *DefaultOddsValidator) ValidateDeleteRequest(request domain.DeleteOddsRequest) error {
-	// Validate league
-	if err := validator.validateLeague(request.League); err != nil {
-		return err
-	}
+	err := validation.ValidateStruct(&request,
+		validation.Field(&request.League,
+			validation.Required.Error("league is required"),
+			validation.By(validator.validateLeague)),
+		validation.Field(&request.HomeTeam,
+			validation.Required.Error("home team is required"),
+			validation.Match(regexp.MustCompile(`^[A-Za-z0-9\s\-]+$`)).Error("invalid team name format")),
+		validation.Field(&request.AwayTeam,
+			validation.Required.Error("away team is required"),
+			validation.Match(regexp.MustCompile(`^[A-Za-z0-9\s\-]+$`)).Error("invalid team name format")),
+		validation.Field(&request.GameDate,
+			validation.Required.Error("game date is required")),
+	)
 
-	// Validate team names
-	if err := validator.validateTeam(request.HomeTeam); err != nil {
-		return fmt.Errorf("invalid home team: %w", err)
-	}
-
-	if err := validator.validateTeam(request.AwayTeam); err != nil {
-		return fmt.Errorf("invalid away team: %w", err)
-	}
-
-	// Validate game date
-	if request.GameDate.IsZero() {
-		return domain.ErrEmptyGameDate
-	}
-
-	return nil
-}
-
-// Helper validation methods
-func (validator *DefaultOddsValidator) validateLeague(league string) error {
-	if league == "" {
-		return domain.ErrEmptyLeagueName
-	}
-
-	if !validator.leagueRegistry.IsSupported(league) {
-		return domain.ErrInvalidLeague
+	if err != nil {
+		return errors.Wrap(err, "validation failed")
 	}
 
 	return nil
 }
 
-func (validator *DefaultOddsValidator) validateTeam(team string) error {
-	if team == "" {
-		return domain.ErrEmptyTeamName
+// validateLeague is a custom validation function for league field
+func (validator *DefaultOddsValidator) validateLeague(value interface{}) error {
+	s, ok := value.(string)
+	if !ok || s == "" {
+		return errors.New("league name is required")
 	}
 
-	// Ensure team name is properly formatted (alphanumeric with spaces)
-	matched, _ := regexp.MatchString(`^[A-Za-z0-9\s\-]+$`, team)
-	if !matched {
-		return domain.ErrInvalidTeamName
+	if err := validator.validateLeagueRegistry(); err != nil {
+		return errors.Wrap(err, "failed to validate league registry")
 	}
 
-	return nil
-}
-
-func (validator *DefaultOddsValidator) validateOddsValue(odds float64) error {
-	if odds <= 1.0 {
-		return domain.ErrInvalidOddsValue
+	if !validator.leagueRegistry.IsSupported(s) {
+		return errors.Errorf("unsupported league: %s", s)
 	}
-
-	return nil
-}
-
-func (validator *DefaultOddsValidator) validateGameDate(date time.Time) error {
-	if date.IsZero() {
-		return domain.ErrEmptyGameDate
-	}
-
-	// Optional: Add more date validations if needed
-	// For example, ensure date is not in the past
-	// if date.Before(time.Now()) {
-	//     return domain.ErrInvalidStartDate
-	// }
 
 	return nil
 }
