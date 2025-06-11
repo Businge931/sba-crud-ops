@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
-	grpcServer "github.com/Businge931/sba-crud-ops/internal/app/grpc"
+	grpcServer "github.com/Businge931/sba-crud-ops/internal/primary/grpc"
 	"github.com/Businge931/sba-crud-ops/proto"
 )
 
@@ -30,7 +30,7 @@ func SetupServer(cfg *Config, components *ApplicationComponents) *Server {
 	server := grpc.NewServer()
 
 	// Register odds service with improved implementation
-	oddsServer := grpcServer.NewImprovedOddsServer(
+	oddsServer := grpcServer.NewOddsServer(
 		components.OddsService,
 	)
 	proto.RegisterOddsServiceServer(server, oddsServer)

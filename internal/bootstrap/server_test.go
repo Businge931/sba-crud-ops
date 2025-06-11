@@ -20,45 +20,64 @@ type mockOddsService struct {
 }
 
 func TestServerSetup(t *testing.T) {
-	cfg := &Config{
-		ServicePort: "0", // Use port 0 to get a random available port
-		ServiceName: "test-service",
+	type dependencies struct{}
+	type args struct {
+		cfg        *Config
+		components *ApplicationComponents
 	}
 
-	components := &ApplicationComponents{
-		OddsService:   &mockOddsService{},
-		OddsValidator: validator.NewDefaultOddsValidator(NewLeagueRegistry(cfg)),
+	testCases := []struct {
+		name         string
+		dependencies dependencies
+		args         args
+		before       func(t *testing.T, deps *dependencies, args *args)
+		after        func(t *testing.T, deps *dependencies, args *args)
+		wantErr      bool
+	}{
+		{
+			name:         "server setup and start",
+			dependencies: dependencies{},
+			args: args{
+				cfg: &Config{
+					ServicePort: "0",
+					ServiceName:  "test-service",
+				},
+				components: &ApplicationComponents{
+					OddsService:   &mockOddsService{},
+					OddsValidator: validator.NewDefaultOddsValidator(NewLeagueRegistry(&Config{ServiceName: "test-service"})),
+				},
+			},
+			wantErr: false,
+		},
 	}
 
-	// Test server setup
-	t.Run("server setup and start", func(t *testing.T) {
-		server := SetupServer(cfg, components)
-		require.NotNil(t, server)
-		require.NotNil(t, server.grpcServer)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.before != nil {
+				tc.before(t, &tc.dependencies, &tc.args)
+			}
+			server := SetupServer(tc.args.cfg, tc.args.components)
+			require.NotNil(t, server)
+			require.NotNil(t, server.grpcServer)
 
-		// Start server in a goroutine
-		errChan := make(chan error, 1)
-		go func() {
-			errChan <- server.Start()
-		}()
-
-		// Give server time to start
-		time.Sleep(100 * time.Millisecond)
-
-		// Test health check
-		testHealthCheck(t, server.listener.Addr().String())
-
-		// Graceful shutdown
-		server.grpcServer.GracefulStop()
-
-		// Verify server stopped
-		select {
-		case err := <-errChan:
-			assert.NoError(t, err)
-		case <-time.After(1 * time.Second):
-			t.Fatal("Server did not stop within timeout")
-		}
-	})
+			errChan := make(chan error, 1)
+			go func() {
+				errChan <- server.Start()
+			}()
+			time.Sleep(100 * time.Millisecond)
+			testHealthCheck(t, server.listener.Addr().String())
+			server.grpcServer.GracefulStop()
+			select {
+			case err := <-errChan:
+				assert.NoError(t, err)
+			case <-time.After(1 * time.Second):
+				t.Fatal("Server did not stop within timeout")
+			}
+			if tc.after != nil {
+				tc.after(t, &tc.dependencies, &tc.args)
+			}
+		})
+	}
 }
 
 func testHealthCheck(t *testing.T, addr string) {
@@ -73,61 +92,99 @@ func testHealthCheck(t *testing.T, addr string) {
 }
 
 func TestServerRegistration(t *testing.T) {
-	tests := []struct {
-		name        string
-		config      *Config
-		expectError bool
+	type dependencies struct{}
+	type args struct {
+		config *Config
+	}
+
+	testCases := []struct {
+		name         string
+		dependencies dependencies
+		args         args
+		before       func(t *testing.T, deps *dependencies, args *args)
+		after        func(t *testing.T, deps *dependencies, args *args)
+		wantErr      bool
 	}{
 		{
-			name: "successful registration",
-			config: &Config{
-				ServiceName: "test-service",
-				GatewayAddr: "localhost:8080",
-			},
-			expectError: false,
+			name:         "successful registration",
+			dependencies: dependencies{},
+			args:         args{config: &Config{ServiceName: "test-service", GatewayAddr: "localhost:8080"}},
+			wantErr:      false,
 		},
 		{
-			name: "invalid gateway address",
-			config: &Config{
-				ServiceName: "test-service",
-				GatewayAddr: "invalid-address",
-			},
-			expectError: true,
+			name:         "invalid gateway address",
+			dependencies: dependencies{},
+			args:         args{config: &Config{ServiceName: "test-service", GatewayAddr: "invalid-address"}},
+			wantErr:      true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.before != nil {
+				tc.before(t, &tc.dependencies, &tc.args)
+			}
 			server := &Server{
-				config:     tt.config,
+				config:     tc.args.config,
 				grpcServer: grpc.NewServer(),
 			}
-
-			// Setup a listener
 			lis, err := net.Listen("tcp", "127.0.0.1:0")
 			require.NoError(t, err)
 			server.listener = lis
-
-			// Note: RegisterWithGateway is not directly testable in unit tests
-			// as it requires a running gateway server. This is better suited for
-			// integration tests.
 			t.Skip("Skipping RegisterWithGateway test as it requires a running gateway server")
+			if tc.after != nil {
+				tc.after(t, &tc.dependencies, &tc.args)
+			}
 		})
 	}
 }
 
 func TestServerStartError(t *testing.T) {
-	// Create a server with an invalid port
-	server := &Server{
-		config:     &Config{ServicePort: "99999"}, // Invalid port number
-		grpcServer: grpc.NewServer(),
+	type dependencies struct{}
+	type args struct {
+		config *Config
 	}
 
-	// Test that Start panics with an invalid port
-	assert.Panics(t, func() {
-		err := server.Start()
-		if err != nil {
-			panic(err)
-		}
-	}, "Expected Start to panic with invalid port")
+	testCases := []struct {
+		name         string
+		dependencies dependencies
+		args         args
+		before       func(t *testing.T, deps *dependencies, args *args)
+		after        func(t *testing.T, deps *dependencies, args *args)
+		wantPanic    bool
+	}{
+		{
+			name:         "invalid port triggers panic",
+			dependencies: dependencies{},
+			args:         args{config: &Config{ServicePort: "99999"}},
+			wantPanic:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.before != nil {
+				tc.before(t, &tc.dependencies, &tc.args)
+			}
+			server := &Server{
+				config:     tc.args.config,
+				grpcServer: grpc.NewServer(),
+			}
+			if tc.wantPanic {
+				assert.Panics(t, func() {
+					err := server.Start()
+					if err != nil {
+						panic(err)
+					}
+				}, "Expected Start to panic with invalid port")
+			} else {
+				assert.NotPanics(t, func() {
+					_ = server.Start()
+				})
+			}
+			if tc.after != nil {
+				tc.after(t, &tc.dependencies, &tc.args)
+			}
+		})
+	}
 }
