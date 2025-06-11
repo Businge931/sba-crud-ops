@@ -2,10 +2,11 @@ package bootstrap
 
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/gorm"
 
 	"github.com/Businge931/sba-crud-ops/internal/core/ports"
 	"github.com/Businge931/sba-crud-ops/internal/core/validator"
-	"github.com/Businge931/sba-crud-ops/internal/repository/postgres"
+	postgresRepo "github.com/Businge931/sba-crud-ops/internal/secondary/postgres"
 	"github.com/Businge931/sba-crud-ops/internal/service"
 )
 
@@ -19,15 +20,15 @@ type ApplicationComponents struct {
 }
 
 // SetupComponents initializes and wires all application components
-func SetupComponents(cfg *Config, pool *pgxpool.Pool) *ApplicationComponents {
+func SetupComponents(cfg *Config, pool *pgxpool.Pool, gormDB *gorm.DB) *ApplicationComponents {
 	// Initialize league registry
 	leagueRegistry := NewLeagueRegistry(cfg)
 
 	// Initialize validator
 	oddsValidator := validator.NewDefaultOddsValidator(leagueRegistry)
 
-	// Initialize repository
-	oddsRepo := postgres.NewOddsRepository(pool)
+	// Always use GORM implementation
+	oddsRepo := postgresRepo.NewOddsRepositoryGorm(gormDB)
 
 	// Initialize service
 	oddsService := service.NewOddsService(oddsRepo, oddsValidator)

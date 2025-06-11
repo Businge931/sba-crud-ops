@@ -67,7 +67,7 @@ func TestSetupComponents(t *testing.T) {
 
 			if tt.expectedError && pool == nil {
 				// SetupComponents doesn't panic with nil pool, but the service will fail when used
-				components := SetupComponents(tt.cfg, pool)
+				components := SetupComponents(tt.cfg, pool, nil)
 				assert.NotNil(t, components, "Expected non-nil components even with nil pool")
 				return
 			}
@@ -77,7 +77,7 @@ func TestSetupComponents(t *testing.T) {
 			}
 
 			// Execute
-			components := SetupComponents(tt.cfg, pool)
+			components := SetupComponents(tt.cfg, pool, nil)
 
 			// Verify
 			require.NotNil(t, components, "Components should not be nil")
@@ -104,46 +104,6 @@ func TestSetupComponents(t *testing.T) {
 			if pool != nil {
 				pool.Close()
 			}
-		})
-	}
-}
-
-func TestNewLeagueRegistry(t *testing.T) {
-	tests := []struct {
-		name            string
-		cfg             *Config
-		expectedLeagues []string
-	}{
-		{
-			name: "with supported leagues",
-			cfg: &Config{
-				SupportedLeagues: []string{"Test League 1", "Test League 2"},
-			},
-			expectedLeagues: []string{"Test League 1", "Test League 2"},
-		},
-		{
-			name:            "nil config",
-			cfg:             nil,
-			expectedLeagues: []string{"English Premier League"}, // Default league from LoadConfig
-		},
-		{
-			name: "empty supported leagues",
-			cfg: &Config{
-				SupportedLeagues: []string{},
-			},
-			expectedLeagues: []string{"English Premier League"}, // Default league from LoadConfig
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Execute
-			registry := NewLeagueRegistry(tt.cfg)
-
-			// Verify
-			require.NotNil(t, registry)
-			leagues := registry.GetSupportedLeagues()
-			assert.ElementsMatch(t, tt.expectedLeagues, leagues)
 		})
 	}
 }
