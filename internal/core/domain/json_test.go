@@ -19,7 +19,7 @@ type testDependencies struct {
 func TestWriteJSON(t *testing.T) {
 	type args struct {
 		status  int
-		data    interface{}
+		data    any
 		headers []http.Header
 	}
 
@@ -115,7 +115,7 @@ func TestWriteJSON(t *testing.T) {
 			}
 
 			// Check body
-			var actual, expected interface{}
+			var actual, expected any
 			err = json.Unmarshal(deps.responseRecorder.Body.Bytes(), &actual)
 			require.NoError(t, err)
 			err = json.Unmarshal([]byte(tt.want), &expected)
@@ -227,7 +227,6 @@ func TestReadJSON(t *testing.T) {
 
 	type args struct {
 		target any
-		req    *http.Request
 	}
 
 	tests := []struct {
@@ -351,7 +350,6 @@ func TestReadJSON(t *testing.T) {
 func TestReadJSON_MaxBytes(t *testing.T) {
 	type args struct {
 		target any
-		req    *http.Request
 	}
 
 	tests := []struct {
