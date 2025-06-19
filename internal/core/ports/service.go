@@ -29,4 +29,11 @@ type (
 		OddsUpdater
 		OddsDeleter
 	}
+
+	OddsValidator interface {
+		ValidateCreateRequest(request domain.CreateOddsRequest) error
+		ValidateReadRequest(request domain.ReadOddsRequest) error
+		ValidateUpdateRequest(request domain.CreateOddsRequest) error
+		ValidateDeleteRequest(request domain.DeleteOddsRequest) error
+	}
 )
