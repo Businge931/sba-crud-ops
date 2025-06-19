@@ -16,90 +16,148 @@ type testDependencies struct {
 	request          *http.Request
 }
 
-func TestWriteJSON(t *testing.T) {
-	type args struct {
+type writeJSONTestCase struct {
+	name   string
+	deps   *testDependencies
+	before func(t *testing.T, tc *writeJSONTestCase)
+	after  func(t *testing.T, tc *writeJSONTestCase)
+	args   struct {
 		status  int
 		data    any
 		headers []http.Header
 	}
+	expected struct {
+		status  int
+		headers http.Header
+		body    string
+		err     bool
+	}
+}
 
-	tests := []struct {
-		name       string
-		setup      func(*testing.T) *testDependencies
-		args       args
-		want       string
-		wantStatus int
-		wantHeader http.Header
-		wantErr    bool
-		cleanup    func(*testing.T, *testDependencies)
-	}{
+func TestWriteJSON(t *testing.T) {
+	tests := []writeJSONTestCase{
 		{
 			name: "successful write with no headers",
-			setup: func(t *testing.T) *testDependencies {
-				return &testDependencies{
+			before: func(t *testing.T, tc *writeJSONTestCase) {
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *writeJSONTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct {
+				status  int
+				data    any
+				headers []http.Header
+			}{
 				status: http.StatusOK,
 				data:   map[string]string{"key": "value"},
 			},
-			want:       `{"key":"value"}` + "\n",
-			wantStatus: http.StatusOK,
-			wantHeader: http.Header{"Content-Type": []string{"application/json"}},
-			wantErr:    false,
-			cleanup:    func(t *testing.T, d *testDependencies) {},
+			expected: struct {
+				status  int
+				headers http.Header
+				body    string
+				err     bool
+			}{
+				status:  http.StatusOK,
+				headers: http.Header{"Content-Type": []string{"application/json"}},
+				body:    `{"key":"value"}` + "\n",
+				err:     false,
+			},
 		},
 		{
 			name: "successful write with custom headers",
-			setup: func(t *testing.T) *testDependencies {
-				return &testDependencies{
+			before: func(t *testing.T, tc *writeJSONTestCase) {
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *writeJSONTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct {
+				status  int
+				data    any
+				headers []http.Header
+			}{
 				status: http.StatusCreated,
 				data:   map[string]string{"key": "value"},
 				headers: []http.Header{{
 					"X-Custom-Header": {"custom-value"},
 				}},
 			},
-			want:       `{"key":"value"}` + "\n",
-			wantStatus: http.StatusCreated,
-			wantHeader: http.Header{
-				"Content-Type":    []string{"application/json"},
-				"X-Custom-Header": []string{"custom-value"},
+			expected: struct {
+				status  int
+				headers http.Header
+				body    string
+				err     bool
+			}{
+				status: http.StatusCreated,
+				headers: http.Header{
+					"Content-Type":    []string{"application/json"},
+					"X-Custom-Header": []string{"custom-value"},
+				},
+				body: `{"key":"value"}` + "\n",
+				err:  false,
 			},
-			wantErr: false,
-			cleanup: func(t *testing.T, d *testDependencies) {},
 		},
 		{
 			name: "error on invalid JSON",
-			setup: func(t *testing.T) *testDependencies {
-				return &testDependencies{
+			before: func(t *testing.T, tc *writeJSONTestCase) {
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *writeJSONTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct {
+				status  int
+				data    any
+				headers []http.Header
+			}{
 				status: http.StatusOK,
 				data:   make(chan int), // Channels can't be JSON marshaled
 			},
-			wantErr: true,
-			cleanup: func(t *testing.T, d *testDependencies) {},
+			expected: struct {
+				status  int
+				headers http.Header
+				body    string
+				err     bool
+			}{
+				err: true,
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup
-			deps := tt.setup(t)
-			defer tt.cleanup(t, deps)
+			tc := tt
+			tc.deps = &testDependencies{}
+
+			// before
+			if tc.before != nil {
+				tc.before(t, &tc)
+			}
+
+			// Register after
+			if tc.after != nil {
+				t.Cleanup(func() {
+					tc.after(t, &tc)
+				})
+			}
 
 			// Execute
-			err := WriteJSON(deps.responseRecorder, tt.args.status, tt.args.data, tt.args.headers...)
+			err := WriteJSON(
+				tc.deps.responseRecorder,
+				tc.args.status,
+				tc.args.data,
+				tc.args.headers...,
+			)
 
 			// Verify
-			if tt.wantErr {
+			if tc.expected.err {
 				assert.Error(t, err)
 				return
 			}
@@ -107,100 +165,147 @@ func TestWriteJSON(t *testing.T) {
 			require.NoError(t, err)
 
 			// Check status code
-			assert.Equal(t, tt.wantStatus, deps.responseRecorder.Code)
+			assert.Equal(t, tc.expected.status, tc.deps.responseRecorder.Code)
 
 			// Check headers
-			for k, v := range tt.wantHeader {
-				assert.Equal(t, v, deps.responseRecorder.Header()[k])
+			for k, v := range tc.expected.headers {
+				assert.Equal(t, v, tc.deps.responseRecorder.Header()[k])
 			}
 
 			// Check body
-			var actual, expected any
-			err = json.Unmarshal(deps.responseRecorder.Body.Bytes(), &actual)
-			require.NoError(t, err)
-			err = json.Unmarshal([]byte(tt.want), &expected)
-			require.NoError(t, err)
-			assert.Equal(t, expected, actual)
+			if tc.expected.body != "" {
+				var actual, expected any
+				err = json.Unmarshal(tc.deps.responseRecorder.Body.Bytes(), &actual)
+				require.NoError(t, err)
+				err = json.Unmarshal([]byte(tc.expected.body), &expected)
+				require.NoError(t, err)
+				assert.Equal(t, expected, actual)
+			}
 		})
 	}
 }
 
-func TestWriteJSONError(t *testing.T) {
-	type args struct {
+type writeJSONErrorTestCase struct {
+	name   string
+	deps   *testDependencies
+	before func(t *testing.T, tc *writeJSONErrorTestCase)
+	after  func(t *testing.T, tc *writeJSONErrorTestCase)
+	args   struct {
 		status  int
 		message string
 		headers []http.Header
 	}
+	expected struct {
+		status  int
+		headers http.Header
+		resp    *JSONResponse
+		err     bool
+	}
+}
 
-	tests := []struct {
-		name        string
-		setup       func(*testing.T) *testDependencies
-		args        args
-		want        *JSONResponse
-		wantStatus  int
-		wantErr     bool
-		wantHeaders http.Header
-		cleanup     func(*testing.T, *testDependencies)
-	}{
+func TestWriteJSONError(t *testing.T) {
+	tests := []writeJSONErrorTestCase{
 		{
 			name: "successful error response",
-			setup: func(t *testing.T) *testDependencies {
-				return &testDependencies{
+			before: func(t *testing.T, tc *writeJSONErrorTestCase) {
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *writeJSONErrorTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct {
+				status  int
+				message string
+				headers []http.Header
+			}{
 				status:  http.StatusBadRequest,
 				message: "invalid input",
 				headers: []http.Header{{"X-Request-ID": {"123"}}},
 			},
-			want: &JSONResponse{
-				Error:   true,
-				Message: "invalid input",
+			expected: struct {
+				status  int
+				headers http.Header
+				resp    *JSONResponse
+				err     bool
+			}{
+				status: http.StatusBadRequest,
+				headers: http.Header{
+					"Content-Type":  {"application/json"},
+					"X-Request-ID": {"123"},
+				},
+				resp: &JSONResponse{
+					Error:   true,
+					Message: "invalid input",
+				},
+				err: false,
 			},
-			wantStatus: http.StatusBadRequest,
-			wantErr:    false,
-			wantHeaders: http.Header{
-				"Content-Type": {"application/json"},
-				"X-Request-ID": {"123"},
-			},
-			cleanup: func(t *testing.T, d *testDependencies) {},
 		},
 		{
 			name: "empty error message",
-			setup: func(t *testing.T) *testDependencies {
-				return &testDependencies{
+			before: func(t *testing.T, tc *writeJSONErrorTestCase) {
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *writeJSONErrorTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct {
+				status  int
+				message string
+				headers []http.Header
+			}{
 				status:  http.StatusInternalServerError,
 				message: "",
 			},
-			want: &JSONResponse{
-				Error:   true,
-				Message: "",
+			expected: struct {
+				status  int
+				headers http.Header
+				resp    *JSONResponse
+				err     bool
+			}{
+				status: http.StatusInternalServerError,
+				headers: http.Header{
+					"Content-Type": {"application/json"},
+				},
+				resp: &JSONResponse{
+					Error:   true,
+					Message: "",
+				},
+				err: false,
 			},
-			wantStatus: http.StatusInternalServerError,
-			wantErr:    false,
-			wantHeaders: http.Header{
-				"Content-Type": {"application/json"},
-			},
-			cleanup: func(t *testing.T, d *testDependencies) {},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tc := tt
+			tc.deps = &testDependencies{}
+
 			// Setup
-			deps := tt.setup(t)
-			defer tt.cleanup(t, deps)
+			if tc.before != nil {
+				tc.before(t, &tc)
+			}
+
+			// Register after
+			if tc.after != nil {
+				t.Cleanup(func() {
+					tc.after(t, &tc)
+				})
+			}
 
 			// Execute
-			err := WriteJSONError(deps.responseRecorder, tt.args.status, tt.args.message, tt.args.headers...)
+			err := WriteJSONError(
+				tc.deps.responseRecorder,
+				tc.args.status,
+				tc.args.message,
+				tc.args.headers...,
+			)
 
 			// Verify
-			if tt.wantErr {
+			if tc.expected.err {
 				assert.Error(t, err)
 				return
 			}
@@ -208,141 +313,186 @@ func TestWriteJSONError(t *testing.T) {
 			require.NoError(t, err)
 
 			// Check status code
-			assert.Equal(t, tt.wantStatus, deps.responseRecorder.Code)
+			assert.Equal(t, tc.expected.status, tc.deps.responseRecorder.Code)
 
-			// Check response body matches expected
+			// Check headers
+			for k, v := range tc.expected.headers {
+				assert.Equal(t, v, tc.deps.responseRecorder.Header()[k])
+			}
+
+			// Check response body
 			var resp JSONResponse
-			err = json.Unmarshal(deps.responseRecorder.Body.Bytes(), &resp)
+			err = json.Unmarshal(tc.deps.responseRecorder.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, &resp)
+			assert.Equal(t, tc.expected.resp, &resp)
 		})
 	}
 }
 
-func TestReadJSON(t *testing.T) {
-	type testStruct struct {
-		Name  string `json:"name"`
-		Value int    `json:"value"`
-	}
+type testStruct struct {
+	Name  string `json:"name"`
+	Value int    `json:"value"`
+}
 
-	type args struct {
+type readJSONTestCase struct {
+	name   string
+	deps   *testDependencies
+	before func(t *testing.T, tc *readJSONTestCase)
+	after  func(t *testing.T, tc *readJSONTestCase)
+	args   struct {
 		target any
 	}
-
-	tests := []struct {
-		name        string
-		setup       func(*testing.T) *testDependencies
-		args        args
-		want        any
-		wantErr     bool
+	expected struct {
+		result      any
+		err         bool
 		errContains string
-		checkHeader bool
-		cleanup     func(*testing.T, *testDependencies)
-	}{
+	}
+}
+
+func TestReadJSON(t *testing.T) {
+	tests := []readJSONTestCase{
 		{
 			name: "successful read",
-			setup: func(t *testing.T) *testDependencies {
+			before: func(t *testing.T, tc *readJSONTestCase) {
 				req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(`{"name":"test","value":42}`))
 				req.Header.Set("Content-Type", "application/json")
-				return &testDependencies{
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 					request:          req,
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *readJSONTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct{ target any }{
 				target: &testStruct{},
 			},
-			want: &testStruct{
-				Name:  "test",
-				Value: 42,
+			expected: struct {
+				result      any
+				err         bool
+				errContains string
+			}{
+				result: &testStruct{
+					Name:  "test",
+					Value: 42,
+				},
+				err: false,
 			},
-			wantErr:     false,
-			checkHeader: false,
-			cleanup:     func(t *testing.T, d *testDependencies) {},
 		},
 		{
 			name: "empty body",
-			setup: func(t *testing.T) *testDependencies {
+			before: func(t *testing.T, tc *readJSONTestCase) {
 				req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(""))
 				req.Header.Set("Content-Type", "application/json")
-				return &testDependencies{
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 					request:          req,
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *readJSONTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct{ target any }{
 				target: &testStruct{},
 			},
-			want:        nil,
-			wantErr:     true,
-			errContains: "EOF",
-			checkHeader: false,
-			cleanup:     func(t *testing.T, d *testDependencies) {},
+			expected: struct {
+				result      any
+				err         bool
+				errContains string
+			}{
+				result:      nil,
+				err:         true,
+				errContains: "EOF",
+			},
 		},
 		{
 			name: "invalid JSON",
-			setup: func(t *testing.T) *testDependencies {
+			before: func(t *testing.T, tc *readJSONTestCase) {
 				req := httptest.NewRequest("POST", "/test", bytes.NewBufferString("{invalid-json}"))
 				req.Header.Set("Content-Type", "application/json")
-				return &testDependencies{
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 					request:          req,
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *readJSONTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct{ target any }{
 				target: &testStruct{},
 			},
-			want:        nil,
-			wantErr:     true,
-			errContains: "invalid character 'i' looking for beginning of object key string",
-			checkHeader: false,
-			cleanup:     func(t *testing.T, d *testDependencies) {},
+			expected: struct {
+				result      any
+				err         bool
+				errContains string
+			}{
+				result:      nil,
+				err:         true,
+				errContains: "invalid character 'i' looking for beginning of object key string",
+			},
 		},
 		{
 			name: "unknown field",
-			setup: func(t *testing.T) *testDependencies {
+			before: func(t *testing.T, tc *readJSONTestCase) {
 				req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(`{"name":"test","value":42,"unknown":"field"}`))
 				req.Header.Set("Content-Type", "application/json")
-				return &testDependencies{
+				tc.deps = &testDependencies{
 					responseRecorder: httptest.NewRecorder(),
 					request:          req,
 				}
 			},
-			args: args{
+			after: func(t *testing.T, tc *readJSONTestCase) {
+				// No cleanup needed for this test case
+			},
+			args: struct{ target any }{
 				target: &testStruct{},
 			},
-			want:        nil,
-			wantErr:     true,
-			errContains: "json: unknown field",
-			checkHeader: false,
-			cleanup:     func(t *testing.T, d *testDependencies) {},
+			expected: struct {
+				result      any
+				err         bool
+				errContains string
+			}{
+				result:      nil,
+				err:         true,
+				errContains: "json: unknown field",
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tc := tt
+			tc.deps = &testDependencies{}
+
 			// Setup
-			deps := tt.setup(t)
-			defer tt.cleanup(t, deps)
+			if tc.before != nil {
+				tc.before(t, &tc)
+			}
+
+			// Register after
+			if tc.after != nil {
+				t.Cleanup(func() {
+					tc.after(t, &tc)
+				})
+			}
 
 			// Execute
-			err := ReadJSON(deps.responseRecorder, deps.request, tt.args.target)
+			err := ReadJSON(tc.deps.responseRecorder, tc.deps.request, tc.args.target)
 
 			// Verify
-			if tt.wantErr {
+			if tc.expected.err {
 				assert.Error(t, err)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
+				if tc.expected.errContains != "" {
+					assert.Contains(t, err.Error(), tc.expected.errContains)
 				}
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, tt.args.target)
+			assert.Equal(t, tc.expected.result, tc.args.target)
 
-			if tt.checkHeader {
-				assert.Equal(t, "application/json", deps.responseRecorder.Header().Get("Content-Type"))
-			}
+			// Check that the request had the correct content type
+			assert.Equal(t, "application/json", tc.deps.request.Header.Get("Content-Type"))
 		})
 	}
 }
