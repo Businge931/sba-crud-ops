@@ -4,18 +4,17 @@ import (
 	"context"
 	"time"
 
+	"github.com/Businge931/sba-crud-ops/internal/adoptors/secondary/validator"
 	"github.com/Businge931/sba-crud-ops/internal/core/domain"
 	"github.com/Businge931/sba-crud-ops/internal/core/ports"
-	"github.com/Businge931/sba-crud-ops/internal/core/validator"
 )
 
-// oddsService implements all the interface methods required by OddsService
 type oddsService struct {
 	repo      ports.OddsRepository
-	validator validator.OddsValidator
+	validator ports.OddsValidator
 }
 
-func NewOddsService(repo ports.OddsRepository, v validator.OddsValidator) ports.OddsService {
+func NewOddsService(repo ports.OddsRepository, v ports.OddsValidator) ports.OddsService {
 	// If no validator is provided, create a default one
 	if v == nil {
 		v = validator.NewDefaultOddsValidator(nil)
@@ -27,9 +26,7 @@ func NewOddsService(repo ports.OddsRepository, v validator.OddsValidator) ports.
 	}
 }
 
-// CreateOdds implements OddsCreator interface
 func (s *oddsService) CreateOdds(ctx context.Context, request domain.CreateOddsRequest) error {
-	// Use the validator instead of inline validation
 	if err := s.validator.ValidateCreateRequest(request); err != nil {
 		return err
 	}
@@ -51,7 +48,6 @@ func (s *oddsService) CreateOdds(ctx context.Context, request domain.CreateOddsR
 
 // ReadOdds implements OddsRetriever interface
 func (s *oddsService) ReadOdds(ctx context.Context, request domain.ReadOddsRequest) ([]domain.Odds, error) {
-	// Use the validator instead of hardcoded checks
 	if err := s.validator.ValidateReadRequest(request); err != nil {
 		return nil, err
 	}
@@ -61,7 +57,6 @@ func (s *oddsService) ReadOdds(ctx context.Context, request domain.ReadOddsReque
 
 // UpdateOdds implements OddsUpdater interface
 func (s *oddsService) UpdateOdds(ctx context.Context, request domain.CreateOddsRequest) error {
-	// Use the validator instead of inline validation
 	if err := s.validator.ValidateUpdateRequest(request); err != nil {
 		return err
 	}
@@ -82,7 +77,6 @@ func (s *oddsService) UpdateOdds(ctx context.Context, request domain.CreateOddsR
 
 // DeleteOdds implements OddsDeleter interface
 func (s *oddsService) DeleteOdds(ctx context.Context, request domain.DeleteOddsRequest) error {
-	// Use the validator instead of hardcoded checks
 	if err := s.validator.ValidateDeleteRequest(request); err != nil {
 		return err
 	}

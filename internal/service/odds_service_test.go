@@ -6,69 +6,11 @@ import (
 	"time"
 
 	"github.com/Businge931/sba-crud-ops/internal/core/domain"
-	"github.com/Businge931/sba-crud-ops/internal/core/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-type testDependencies struct {
-	repo      *MockOddsRepository
-	validator *MockOddsValidator
-	service   ports.OddsService
-}
-
-// MockOddsRepository is a mock implementation of the OddsRepository interface
-type MockOddsRepository struct {
-	mock.Mock
-}
-
-func (m *MockOddsRepository) Create(ctx context.Context, odds *domain.Odds) error {
-	args := m.Called(ctx, odds)
-	return args.Error(0)
-}
-
-func (m *MockOddsRepository) Read(ctx context.Context, league string, date time.Time) ([]domain.Odds, error) {
-	args := m.Called(ctx, league, date)
-	return args.Get(0).([]domain.Odds), args.Error(1)
-}
-
-func (m *MockOddsRepository) Update(ctx context.Context, odds *domain.Odds) error {
-	args := m.Called(ctx, odds)
-	return args.Error(0)
-}
-
-func (m *MockOddsRepository) Delete(ctx context.Context, league, homeTeam, awayTeam string, gameDate time.Time) error {
-	args := m.Called(ctx, league, homeTeam, awayTeam, gameDate)
-	return args.Error(0)
-}
-
-// MockOddsValidator is a mock implementation of the OddsValidator interface
-type MockOddsValidator struct {
-	mock.Mock
-}
-
-func (m *MockOddsValidator) ValidateCreateRequest(request domain.CreateOddsRequest) error {
-	args := m.Called(request)
-	return args.Error(0)
-}
-
-func (m *MockOddsValidator) ValidateReadRequest(request domain.ReadOddsRequest) error {
-	args := m.Called(request)
-	return args.Error(0)
-}
-
-func (m *MockOddsValidator) ValidateUpdateRequest(request domain.CreateOddsRequest) error {
-	args := m.Called(request)
-	return args.Error(0)
-}
-
-func (m *MockOddsValidator) ValidateDeleteRequest(request domain.DeleteOddsRequest) error {
-	args := m.Called(request)
-	return args.Error(0)
-}
-
 func TestCreateOdds(t *testing.T) {
-	// Common test data
 	validRequest := domain.CreateOddsRequest{
 		League:          "English Premier League",
 		HomeTeam:        "Manchester United",
@@ -88,7 +30,7 @@ func TestCreateOdds(t *testing.T) {
 		name        string
 		args        testArgs
 		before      func(*testDependencies)
-		after       func(*testing.T, *testDependencies)
+		after       func(*testing.T, *testDependencies, error)
 		expectedErr error
 	}{
 		{
@@ -101,9 +43,11 @@ func TestCreateOdds(t *testing.T) {
 				d.validator.On("ValidateCreateRequest", validRequest).Return(nil)
 				d.repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Odds")).Return(nil)
 			},
-			after: func(t *testing.T, d *testDependencies) {
+			after: func(t *testing.T, d *testDependencies, err error) {
 				d.repo.AssertExpectations(t)
 				d.validator.AssertExpectations(t)
+				assert.NoError(t, err)
+
 			},
 			expectedErr: nil,
 		},
@@ -116,7 +60,7 @@ func TestCreateOdds(t *testing.T) {
 			before: func(d *testDependencies) {
 				d.validator.On("ValidateCreateRequest", validRequest).Return(domain.ErrInvalidLeague)
 			},
-			after: func(t *testing.T, d *testDependencies) {
+			after: func(t *testing.T, d *testDependencies, err error) {
 				d.validator.AssertExpectations(t)
 				d.repo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 			},
@@ -132,7 +76,7 @@ func TestCreateOdds(t *testing.T) {
 				d.validator.On("ValidateCreateRequest", validRequest).Return(nil)
 				d.repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Odds")).Return(domain.ErrInvalidConfiguration)
 			},
-			after: func(t *testing.T, d *testDependencies) {
+			after: func(t *testing.T, d *testDependencies, err error) {
 				d.validator.AssertExpectations(t)
 				d.repo.AssertExpectations(t)
 			},
@@ -157,23 +101,15 @@ func TestCreateOdds(t *testing.T) {
 			// Execute
 			err := deps.service.CreateOdds(tt.args.ctx, tt.args.request)
 
-			// Verify results
-			if tt.expectedErr != nil {
-				assert.ErrorIs(t, err, tt.expectedErr)
-			} else {
-				assert.NoError(t, err)
-			}
-
 			// Cleanup
 			if tt.after != nil {
-				tt.after(t, &deps)
+				tt.after(t, &deps, err)
 			}
 		})
 	}
 }
 
 func TestReadOdds(t *testing.T) {
-	// Common test data
 	validRequest := domain.ReadOddsRequest{
 		League: "English Premier League",
 		Date:   time.Now(),
@@ -293,7 +229,6 @@ func TestReadOdds(t *testing.T) {
 }
 
 func TestUpdateOdds(t *testing.T) {
-	// Common test data
 	validRequest := domain.CreateOddsRequest{
 		League:          "English Premier League",
 		HomeTeam:        "Manchester United",
@@ -419,7 +354,6 @@ func TestUpdateOdds(t *testing.T) {
 }
 
 func TestDeleteOdds(t *testing.T) {
-	// Common test data
 	gameDate := time.Now().Add(24 * time.Hour)
 	validRequest := domain.DeleteOddsRequest{
 		League:   "English Premier League",
