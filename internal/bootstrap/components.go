@@ -4,19 +4,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gorm.io/gorm"
 
+	postgresRepo "github.com/Businge931/sba-crud-ops/internal/adoptors/secondary/postgres"
+	"github.com/Businge931/sba-crud-ops/internal/adoptors/secondary/validator"
 	"github.com/Businge931/sba-crud-ops/internal/core/ports"
-	"github.com/Businge931/sba-crud-ops/internal/core/validator"
-	postgresRepo "github.com/Businge931/sba-crud-ops/internal/secondary/postgres"
 	"github.com/Businge931/sba-crud-ops/internal/service"
 )
 
-// ApplicationComponents holds all the application components and services
 type ApplicationComponents struct {
 	// Services
 	OddsService ports.OddsService
 
 	// Other components needed by the server
-	OddsValidator validator.OddsValidator
+	OddsValidator ports.OddsValidator
 }
 
 // SetupComponents initializes and wires all application components
