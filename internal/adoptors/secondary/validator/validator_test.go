@@ -6,363 +6,493 @@ import (
 	"time"
 
 	"github.com/Businge931/sba-crud-ops/internal/core/domain"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/mock"
 )
 
-// assertError checks if the error contains the expected error message
-func assertError(t *testing.T, err error, wantErr error) {
-	if wantErr != nil {
-		require.Error(t, err)
-		require.Contains(t, err.Error(), wantErr.Error())
-	} else {
-		require.NoError(t, err)
-	}
+type createRequestTestDeps struct {
+	mockRegistry *MockLeagueRegistry
 }
 
-// MockLeagueRegistry is a mock implementation of the LeagueRegistry interface
-type MockLeagueRegistry struct {
-	mock.Mock
+type createRequestTestArgs struct {
+	request domain.CreateOddsRequest
 }
 
-func (m *MockLeagueRegistry) IsSupported(league string) bool {
-	args := m.Called(league)
-	return args.Bool(0)
-}
-
-func (m *MockLeagueRegistry) SupportedLeagues() []string {
-	args := m.Called()
-	return args.Get(0).([]string)
-}
-
-func (m *MockLeagueRegistry) GetSupportedLeagues() []string {
-	args := m.Called()
-	return args.Get(0).([]string)
-}
-
-func (m *MockLeagueRegistry) RegisterLeague(league string) error {
-	args := m.Called(league)
-	return args.Error(0)
-}
-
-func (m *MockLeagueRegistry) UnregisterLeague(league string) error {
-	args := m.Called(league)
-	return args.Error(0)
+type validateCreateRequestTest struct {
+	name           string
+	deps           createRequestTestDeps
+	args           createRequestTestArgs
+	before         func(testing.TB, *createRequestTestDeps)
+	after          func(testing.TB, *createRequestTestDeps)
+	expectedResult any
+	expectedErr    error
 }
 
 func TestValidateCreateRequest(t *testing.T) {
-	// Create a mock league registry
-	mockRegistry := new(MockLeagueRegistry)
-	mockRegistry.On("IsSupported", "English Premier League").Return(true)
-	mockRegistry.On("IsSupported", "Invalid League").Return(false)
+	// Common test data
+	validRequest := domain.CreateOddsRequest{
+		League:          "English Premier League",
+		HomeTeam:        "Manchester United",
+		AwayTeam:        "Liverpool",
+		HomeTeamWinOdds: 2.5,
+		AwayTeamWinOdds: 2.1,
+		DrawOdds:        3.0,
+		GameDate:        time.Now().Add(24 * time.Hour), // Tomorrow
+	}
 
-	validator := NewDefaultOddsValidator(mockRegistry)
-
-	// Setup test cases
-	tests := []struct {
-		name    string
-		request domain.CreateOddsRequest
-		wantErr error
-	}{
+	tests := []validateCreateRequestTest{
 		{
 			name: "Valid request",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour), // Tomorrow
+			deps: createRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: nil,
+			args: createRequestTestArgs{
+				request: validRequest,
+			},
+			before: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    nil,
 		},
 		{
 			name: "Invalid league",
-			request: domain.CreateOddsRequest{
-				League:          "Invalid League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour), // Tomorrow
+			deps: createRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("league: unsupported league: Invalid League."),
+			args: createRequestTestArgs{
+				request: func() domain.CreateOddsRequest {
+					r := validRequest
+					r.League = "Invalid League"
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "Invalid League").Return(false)
+			},
+			after: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("league: unsupported league: Invalid League."),
 		},
 		{
 			name: "Empty home team",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour),
+			deps: createRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("home_team: home team is required."),
+			args: createRequestTestArgs{
+				request: func() domain.CreateOddsRequest {
+					r := validRequest
+					r.HomeTeam = ""
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("home_team: home team is required."),
 		},
 		{
 			name: "Empty away team",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour),
+			deps: createRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("away_team: away team is required."),
+			args: createRequestTestArgs{
+				request: func() domain.CreateOddsRequest {
+					r := validRequest
+					r.AwayTeam = ""
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("away_team: away team is required."),
 		},
 		{
 			name: "Invalid home team odds",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 0.5, // Invalid odds value
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour),
+			deps: createRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: domain.ErrInvalidOddsValue,
+			args: createRequestTestArgs{
+				request: func() domain.CreateOddsRequest {
+					r := validRequest
+					r.HomeTeamWinOdds = 0.5
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    domain.ErrInvalidOddsValue,
 		},
 		{
 			name: "Invalid away team odds",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 0.9, // Invalid odds value
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour),
+			deps: createRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: domain.ErrInvalidOddsValue,
+			args: createRequestTestArgs{
+				request: func() domain.CreateOddsRequest {
+					r := validRequest
+					r.AwayTeamWinOdds = 0.9
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    domain.ErrInvalidOddsValue,
 		},
 		{
 			name: "Invalid draw odds",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        0.8, // Invalid odds value
-				GameDate:        time.Now().Add(24 * time.Hour),
+			deps: createRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: domain.ErrInvalidOddsValue,
+			args: createRequestTestArgs{
+				request: func() domain.CreateOddsRequest {
+					r := validRequest
+					r.DrawOdds = 0.8
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    domain.ErrInvalidOddsValue,
 		},
 		{
 			name: "Empty game date",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Time{}, // Zero time
+			deps: createRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("game_date: game date is required."),
+			args: createRequestTestArgs{
+				request: func() domain.CreateOddsRequest {
+					r := validRequest
+					r.GameDate = time.Time{}
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *createRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("game_date: game date is required."),
 		},
 	}
 
-	// Run tests
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateCreateRequest(tt.request)
-			assertError(t, err, tt.wantErr)
+			// Setup test dependencies
+			if tt.before != nil {
+				tt.before(t, &tt.deps)
+			}
+
+			// Create validator with mock dependencies
+			validator := NewDefaultOddsValidator(tt.deps.mockRegistry)
+
+			// Execute test
+			err := validator.ValidateCreateRequest(tt.args.request)
+
+			// Verify results
+			assertError(t, err, tt.expectedErr)
+
+			// Run after function if provided
+			if tt.after != nil {
+				tt.after(t, &tt.deps)
+			}
 		})
 	}
+}
+
+type readRequestTestDeps struct {
+	mockRegistry *MockLeagueRegistry
+}
+
+type readRequestTestArgs struct {
+	request domain.ReadOddsRequest
+}
+
+type validateReadRequestTest struct {
+	name           string
+	deps           readRequestTestDeps
+	args           readRequestTestArgs
+	before         func(testing.TB, *readRequestTestDeps)
+	after          func(testing.TB, *readRequestTestDeps)
+	expectedResult any
+	expectedErr    error
 }
 
 func TestValidateReadRequest(t *testing.T) {
-	// Create a mock league registry
-	mockRegistry := new(MockLeagueRegistry)
-	mockRegistry.On("IsSupported", "English Premier League").Return(true)
-	mockRegistry.On("IsSupported", "Invalid League").Return(false)
+	// Common test data
+	now := time.Now()
+	validRequest := domain.ReadOddsRequest{
+		League: "English Premier League",
+		Date:   now,
+	}
 
-	validator := NewDefaultOddsValidator(mockRegistry)
-
-	// Setup test cases
-	tests := []struct {
-		name    string
-		request domain.ReadOddsRequest
-		wantErr error
-	}{
+	tests := []validateReadRequestTest{
 		{
 			name: "Valid request",
-			request: domain.ReadOddsRequest{
-				League: "English Premier League",
-				Date:   time.Now(),
+			deps: readRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: nil,
+			args: readRequestTestArgs{
+				request: validRequest,
+			},
+			before: func(t testing.TB, deps *readRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *readRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    nil,
 		},
 		{
 			name: "Invalid league",
-			request: domain.ReadOddsRequest{
-				League: "Invalid League",
-				Date:   time.Now(),
+			deps: readRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("league: unsupported league: Invalid League."),
+			args: readRequestTestArgs{
+				request: func() domain.ReadOddsRequest {
+					r := validRequest
+					r.League = "Invalid League"
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *readRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "Invalid League").Return(false)
+			},
+			after: func(t testing.TB, deps *readRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("league: unsupported league: Invalid League."),
 		},
 		{
 			name: "Empty date",
-			request: domain.ReadOddsRequest{
-				League: "English Premier League",
-				Date:   time.Time{}, // Zero time
+			deps: readRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("date: date is required."),
+			args: readRequestTestArgs{
+				request: func() domain.ReadOddsRequest {
+					r := validRequest
+					r.Date = time.Time{}
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *readRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *readRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("date: date is required."),
 		},
 	}
 
-	// Run tests
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateReadRequest(tt.request)
-			assertError(t, err, tt.wantErr)
+			// Setup test dependencies
+			if tt.before != nil {
+				tt.before(t, &tt.deps)
+			}
+
+			// Create validator with mock dependencies
+			validator := NewDefaultOddsValidator(tt.deps.mockRegistry)
+
+			// Execute test
+			err := validator.ValidateReadRequest(tt.args.request)
+
+			// Verify results
+			assertError(t, err, tt.expectedErr)
+
+			// Run after function if provided
+			if tt.after != nil {
+				tt.after(t, &tt.deps)
+			}
 		})
 	}
+}
+
+type deleteRequestTestDeps struct {
+	mockRegistry *MockLeagueRegistry
+}
+
+type deleteRequestTestArgs struct {
+	request domain.DeleteOddsRequest
+}
+
+type validateDeleteRequestTest struct {
+	name           string
+	deps           deleteRequestTestDeps
+	args           deleteRequestTestArgs
+	before         func(testing.TB, *deleteRequestTestDeps)
+	after          func(testing.TB, *deleteRequestTestDeps)
+	expectedResult any
+	expectedErr    error
 }
 
 func TestValidateDeleteRequest(t *testing.T) {
-	// Create a mock league registry
-	mockRegistry := new(MockLeagueRegistry)
-	mockRegistry.On("IsSupported", "English Premier League").Return(true)
-	mockRegistry.On("IsSupported", "Invalid League").Return(false)
+	// Common test data
+	now := time.Now()
+	validRequest := domain.DeleteOddsRequest{
+		League:   "English Premier League",
+		HomeTeam: "Manchester United",
+		AwayTeam: "Liverpool",
+		GameDate: now,
+	}
 
-	validator := NewDefaultOddsValidator(mockRegistry)
-
-	// Setup test cases
-	tests := []struct {
-		name    string
-		request domain.DeleteOddsRequest
-		wantErr error
-	}{
+	tests := []validateDeleteRequestTest{
 		{
 			name: "Valid request",
-			request: domain.DeleteOddsRequest{
-				League:   "English Premier League",
-				HomeTeam: "Manchester United",
-				AwayTeam: "Liverpool",
-				GameDate: time.Now(),
+			deps: deleteRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: nil,
+			args: deleteRequestTestArgs{
+				request: validRequest,
+			},
+			before: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    nil,
 		},
 		{
 			name: "Invalid league",
-			request: domain.DeleteOddsRequest{
-				League:   "Invalid League",
-				HomeTeam: "Manchester United",
-				AwayTeam: "Liverpool",
-				GameDate: time.Now(),
+			deps: deleteRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("league: unsupported league: Invalid League."),
+			args: deleteRequestTestArgs{
+				request: func() domain.DeleteOddsRequest {
+					r := validRequest
+					r.League = "Invalid League"
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "Invalid League").Return(false)
+			},
+			after: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("league: unsupported league: Invalid League."),
 		},
 		{
 			name: "Empty home team",
-			request: domain.DeleteOddsRequest{
-				League:   "English Premier League",
-				HomeTeam: "",
-				AwayTeam: "Liverpool",
-				GameDate: time.Now(),
+			deps: deleteRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("home_team: home team is required."),
+			args: deleteRequestTestArgs{
+				request: func() domain.DeleteOddsRequest {
+					r := validRequest
+					r.HomeTeam = ""
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("home_team: home team is required."),
 		},
 		{
 			name: "Empty away team",
-			request: domain.DeleteOddsRequest{
-				League:   "English Premier League",
-				HomeTeam: "Manchester United",
-				AwayTeam: "",
-				GameDate: time.Now(),
+			deps: deleteRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("away_team: away team is required."),
+			args: deleteRequestTestArgs{
+				request: func() domain.DeleteOddsRequest {
+					r := validRequest
+					r.AwayTeam = ""
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("away_team: away team is required."),
 		},
 		{
 			name: "Empty game date",
-			request: domain.DeleteOddsRequest{
-				League:   "English Premier League",
-				HomeTeam: "Manchester United",
-				AwayTeam: "Liverpool",
-				GameDate: time.Time{}, // Zero time
+			deps: deleteRequestTestDeps{
+				mockRegistry: new(MockLeagueRegistry),
 			},
-			wantErr: errors.New("game_date: game date is required."),
+			args: deleteRequestTestArgs{
+				request: func() domain.DeleteOddsRequest {
+					r := validRequest
+					r.GameDate = time.Time{}
+					return r
+				}(),
+			},
+			before: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.On("IsSupported", "English Premier League").Return(true)
+			},
+			after: func(t testing.TB, deps *deleteRequestTestDeps) {
+				deps.mockRegistry.AssertExpectations(t)
+			},
+			expectedResult: nil,
+			expectedErr:    errors.New("game_date: game date is required."),
 		},
 	}
 
-	// Run tests
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateDeleteRequest(tt.request)
-			assertError(t, err, tt.wantErr)
-		})
-	}
-}
+			// Setup test dependencies
+			if tt.before != nil {
+				tt.before(t, &tt.deps)
+			}
 
-func TestValidateUpdateRequest(t *testing.T) {
-	// Create a mock league registry
-	mockRegistry := new(MockLeagueRegistry)
-	mockRegistry.On("IsSupported", "English Premier League").Return(true)
-	mockRegistry.On("IsSupported", "Invalid League").Return(false)
+			// Create validator with mock dependencies
+			validator := NewDefaultOddsValidator(tt.deps.mockRegistry)
 
-	validator := NewDefaultOddsValidator(mockRegistry)
+			// Execute test
+			err := validator.ValidateDeleteRequest(tt.args.request)
 
-	// Setup test cases
-	tests := []struct {
-		name    string
-		request domain.CreateOddsRequest
-		wantErr error
-	}{
-		{
-			name: "Valid update request",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour), // Tomorrow
-			},
-			wantErr: nil,
-		},
-		{
-			name: "Invalid league for update",
-			request: domain.CreateOddsRequest{
-				League:          "Invalid League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 2.5,
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour),
-			},
-			wantErr: errors.New("league: unsupported league: Invalid League."),
-		},
-		{
-			name: "Updated invalid odds",
-			request: domain.CreateOddsRequest{
-				League:          "English Premier League",
-				HomeTeam:        "Manchester United",
-				AwayTeam:        "Liverpool",
-				HomeTeamWinOdds: 0.9, // Invalid odds value
-				AwayTeamWinOdds: 2.1,
-				DrawOdds:        3.0,
-				GameDate:        time.Now().Add(24 * time.Hour),
-			},
-			wantErr: errors.New("home_team_win_odds: odds must be greater than 1.0."),
-		},
-	}
+			// Verify results
+			assertError(t, err, tt.expectedErr)
 
-	// Run tests
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateUpdateRequest(tt.request)
-			assertError(t, err, tt.wantErr)
+			// Run after function if provided
+			if tt.after != nil {
+				tt.after(t, &tt.deps)
+			}
 		})
 	}
 }
