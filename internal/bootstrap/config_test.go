@@ -11,45 +11,70 @@ func TestConfigDummy(t *testing.T) {
 	assert.True(t, true, "This test should always pass")
 }
 
+type loadConfigTestDeps struct {
+	// Currently no external dependencies for this test
+}
+
+type loadConfigTestArgs struct {
+	envVars map[string]string
+}
+
+type loadConfigTest struct {
+	name           string
+	deps           loadConfigTestDeps
+	args           loadConfigTestArgs
+	after          func(testing.TB, *loadConfigTestDeps)
+	expectedConfig *Config
+}
+
 func TestLoadConfig(t *testing.T) {
-	tests := []struct {
-		name           string
-		envVars        map[string]string
-		expectedConfig *Config
-		expectedErr    bool
-	}{
+	defaultConfig := &Config{
+		ServicePort:  "50052",
+		ServiceName:  "odds-service",
+		Version:      "0.0.1",
+		GatewayAddr:  "localhost:8080",
+		DBAddr:       "postgresql://admin:adminpassword@localhost:5433/sba_crud_ops?sslmode=disable",
+		MaxOpenConns: 30,
+		MaxIdleConns: 30,
+		MaxIdleTime:  "15m",
+		SupportedLeagues: []string{
+			"English Premier League",
+			"La Liga",
+			"Serie A",
+			"Bundesliga",
+			"Ligue 1",
+		},
+	}
+
+	tests := []loadConfigTest{
 		{
-			name:    "default values",
-			envVars: map[string]string{},
-			expectedConfig: &Config{
-				ServicePort:  "50052",
-				ServiceName:  "odds-service",
-				Version:      "0.0.1",
-				GatewayAddr:  "localhost:8080",
-				DBAddr:       "postgresql://admin:adminpassword@localhost:5433/sba_crud_ops?sslmode=disable",
-				MaxOpenConns: 30,
-				MaxIdleConns: 30,
-				MaxIdleTime:  "15m",
-				SupportedLeagues: []string{
-					"English Premier League",
-					"La Liga",
-					"Serie A",
-					"Bundesliga",
-					"Ligue 1",
-				},
+			name: "default values",
+			args: loadConfigTestArgs{
+				envVars: map[string]string{},
 			},
+			after: func(t testing.TB, _ *loadConfigTestDeps) {
+				// Clean up environment variables after test
+				resetEnvVars()
+			},
+			expectedConfig: defaultConfig,
 		},
 		{
 			name: "custom values",
-			envVars: map[string]string{
-				"SERVICE_PORT":      "8080",
-				"SERVICE_NAME":      "test-service",
-				"VERSION":           "1.0.0",
-				"GATEWAY_ADDR":      "gateway:9090",
-				"DB_ADDR":           "postgresql://user:pass@localhost:5432/testdb",
-				"DB_MAX_OPEN_CONNS": "50",
-				"DB_MAX_IDLE_CONNS": "25",
-				"DB_MAX_IDLE_TIME":  "10m",
+			args: loadConfigTestArgs{
+				envVars: map[string]string{
+					"SERVICE_PORT":      "8080",
+					"SERVICE_NAME":      "test-service",
+					"VERSION":           "1.0.0",
+					"GATEWAY_ADDR":      "gateway:9090",
+					"DB_ADDR":           "postgresql://user:pass@localhost:5432/testdb",
+					"DB_MAX_OPEN_CONNS": "50",
+					"DB_MAX_IDLE_CONNS": "25",
+					"DB_MAX_IDLE_TIME":  "10m",
+				},
+			},
+			after: func(t testing.TB, _ *loadConfigTestDeps) {
+				// Clean up environment variables after test
+				resetEnvVars()
 			},
 			expectedConfig: &Config{
 				ServicePort:  "8080",
@@ -73,15 +98,20 @@ func TestLoadConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup
+			// Setup test environment
 			resetEnvVars()
-			setEnvVars(t, tt.envVars)
+			setEnvVars(t, tt.args.envVars)
 
-			// Execute
+			// Execute test
 			config := LoadConfig()
 
-			// Verify
+			// Verify results
 			assertConfigEqual(t, tt.expectedConfig, config)
+
+			// Run after function if provided
+			if tt.after != nil {
+				tt.after(t, &tt.deps)
+			}
 		})
 	}
 }
