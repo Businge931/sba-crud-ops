@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
-	grpcServer "github.com/Businge931/sba-crud-ops/internal/primary/grpc"
+	grpcServer "github.com/Businge931/sba-crud-ops/internal/adoptors/primary/grpc"
 	"github.com/Businge931/sba-crud-ops/proto"
 )
 
