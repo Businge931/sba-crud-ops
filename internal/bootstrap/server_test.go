@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Businge931/sba-crud-ops/internal/adoptors/secondary/validator"
 	"github.com/Businge931/sba-crud-ops/internal/core/ports"
-	"github.com/Businge931/sba-crud-ops/internal/core/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -40,7 +40,7 @@ func TestServerSetup(t *testing.T) {
 			args: args{
 				cfg: &Config{
 					ServicePort: "0",
-					ServiceName:  "test-service",
+					ServiceName: "test-service",
 				},
 				components: &ApplicationComponents{
 					OddsService:   &mockOddsService{},
