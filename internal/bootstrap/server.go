@@ -72,7 +72,7 @@ func (s *Server) RegisterWithGateway() {
 		maxRetries := 3
 		retryInterval := 5 * time.Second
 
-		for i := 0; i < maxRetries; i++ {
+		for i := range maxRetries {
 			log.Printf("Attempting to register with API gateway at %s (attempt %d/%d)", gatewayAddr, i+1, maxRetries)
 
 			// Skip registration if gateway address is the default localhost:8080
@@ -84,7 +84,7 @@ func (s *Server) RegisterWithGateway() {
 			}
 
 			// Connect to API Gateway
-			conn, err := grpc.Dial(
+			conn, err := grpc.NewClient(
 				gatewayAddr,
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 			)
@@ -93,7 +93,7 @@ func (s *Server) RegisterWithGateway() {
 				time.Sleep(retryInterval)
 				continue
 			}
-
+			defer conn.Close()
 			// Create client for gateway registration service
 			client := proto.NewOddsServiceClient(conn)
 
