@@ -27,7 +27,7 @@ func SetupComponents(cfg *Config, pool *pgxpool.Pool, gormDB *gorm.DB) *Applicat
 	oddsValidator := validator.NewDefaultOddsValidator(leagueRegistry)
 
 	// Always use GORM implementation
-	oddsRepo := postgresRepo.NewOddsRepositoryGorm(gormDB)
+	oddsRepo := postgresRepo.NewOddsRepository(gormDB)
 
 	// Initialize service
 	oddsService := service.NewOddsService(oddsRepo, oddsValidator)
