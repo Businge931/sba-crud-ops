@@ -83,7 +83,7 @@ func createTestOdds(league, homeTeam, awayTeam string, homeOdds, awayOdds, drawO
 func setupTestDependencies(t *testing.T) (testDependencies, func()) {
 	ctx := context.Background()
 	container, db, cleanup := setupTestContainerGorm(t, ctx)
-	repo := NewOddsRepositoryGorm(db)
+	repo := NewOddsRepository(db)
 	return testDependencies{
 		ctx:       ctx,
 		container: container,
