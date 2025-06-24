@@ -14,7 +14,7 @@ import (
 )
 
 // SetupGormDB initializes and configures the GORM database connection
-func SetupGormDB(cfg *bootstrap.Config) (*gorm.DB, error) {
+func SetupDB(cfg *bootstrap.Config) (*gorm.DB, error) {
 	var dsn string
 	if cfg.DBAddr != "" {
 		dsn = cfg.DBAddr
