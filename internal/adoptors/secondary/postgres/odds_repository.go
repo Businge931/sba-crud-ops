@@ -10,18 +10,18 @@ import (
 	"github.com/Businge931/sba-crud-ops/internal/core/ports"
 )
 
-type oddsRepositoryGorm struct {
+type oddsRepository struct {
 	db *gorm.DB
 }
 
-// NewOddsRepositoryGorm creates a new instance of oddsRepositoryGorm
-func NewOddsRepositoryGorm(db *gorm.DB) ports.OddsRepository {
-	return &oddsRepositoryGorm{
+// NewOddsRepository creates a new instance of oddsRepository
+func NewOddsRepository(db *gorm.DB) ports.OddsRepository {
+	return &oddsRepository{
 		db: db,
 	}
 }
 
-func (r *oddsRepositoryGorm) Create(ctx context.Context, odds *domain.Odds) error {
+func (r *oddsRepository) Create(ctx context.Context, odds *domain.Odds) error {
 	result := r.db.WithContext(ctx).Create(odds)
 	if result.Error != nil {
 		return result.Error
@@ -29,7 +29,7 @@ func (r *oddsRepositoryGorm) Create(ctx context.Context, odds *domain.Odds) erro
 	return nil
 }
 
-func (r *oddsRepositoryGorm) Read(ctx context.Context, league string, date time.Time) ([]domain.Odds, error) {
+func (r *oddsRepository) Read(ctx context.Context, league string, date time.Time) ([]domain.Odds, error) {
 	var odds []domain.Odds
 
 	// Format the date to compare only the date part
@@ -47,7 +47,7 @@ func (r *oddsRepositoryGorm) Read(ctx context.Context, league string, date time.
 	return odds, nil
 }
 
-func (r *oddsRepositoryGorm) Update(ctx context.Context, odds *domain.Odds) error {
+func (r *oddsRepository) Update(ctx context.Context, odds *domain.Odds) error {
 	// First, find the existing record to get the ID
 	existingOdds := &domain.Odds{}
 	err := r.db.WithContext(ctx).
@@ -73,7 +73,7 @@ func (r *oddsRepositoryGorm) Update(ctx context.Context, odds *domain.Odds) erro
 	return nil
 }
 
-func (r *oddsRepositoryGorm) Delete(ctx context.Context, league, homeTeam, awayTeam string, gameDate time.Time) error {
+func (r *oddsRepository) Delete(ctx context.Context, league, homeTeam, awayTeam string, gameDate time.Time) error {
 	// Format the date to compare only the date part
 	dateStr := gameDate.Format("2006-01-02")
 
