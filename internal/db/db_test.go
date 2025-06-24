@@ -138,7 +138,7 @@ func TestSetupGormDB(t *testing.T) {
 			if tc.name == "valid config (containerized test DB)" {
 				t.Logf("Connecting with DSN: %s", tc.args.cfg.DBAddr)
 				for i := 0; i < 10; i++ {
-					dbConn, dbErr = db.SetupGormDB(tc.args.cfg)
+					dbConn, dbErr = db.SetupDB(tc.args.cfg)
 					if dbErr == nil {
 						break
 					}
@@ -156,7 +156,7 @@ func TestSetupGormDB(t *testing.T) {
 					require.NoError(t, sqlDB.PingContext(context.Background()))
 				}
 			} else {
-				db, err := db.SetupGormDB(tc.args.cfg)
+				db, err := db.SetupDB(tc.args.cfg)
 				if tc.wantErr {
 					require.Error(t, err)
 					require.Nil(t, db)
@@ -258,7 +258,7 @@ func TestRunMigrations(t *testing.T) {
 				var dbConn *gorm.DB
 				var dbErr error
 				for i := 0; i < 10; i++ {
-					dbConn, dbErr = db.SetupGormDB(cfg)
+					dbConn, dbErr = db.SetupDB(cfg)
 					if dbErr == nil {
 						break
 					}
