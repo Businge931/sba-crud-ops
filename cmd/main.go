@@ -22,7 +22,7 @@ func main() {
 
 	if cfg.UseGORM {
 		// Initialize GORM database
-		gormDB, err = db.SetupGormDB(cfg)
+		gormDB, err = db.SetupDB(cfg)
 		if err != nil {
 			log.Panicf("Failed to connect to GORM database: %v", err)
 		}
