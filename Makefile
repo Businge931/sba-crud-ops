@@ -7,6 +7,13 @@ LINT_PATH = $(GOBASE)/build/lint
 MAIN_APP = $(GOBASE)/cmd
 MIGRATIONS_PATH=$(GOBASE)/migrations
 
+# Default database connection details (matches docker-compose.yml)
+DB_USER ?= admin
+DB_PASSWORD ?= adminpassword
+DB_NAME ?= sba_crud_ops
+DB_HOST ?= localhost
+DB_PORT ?= 5433
+DB_ADDR ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
 
 
 help:
@@ -40,6 +47,15 @@ migrate-down: ## Run the migration down
 migration: ## Create a new migration
 	@migrate create -ext sql -dir $(MIGRATIONS_PATH) -seq $(filter-out $@,$(MAKECMDGOALS))		
 
+
+docker-up: ## Run the docker-compose
+	docker compose up -d
+
+docker-down: ## Stop the docker-compose
+	docker compose down
+
+docker-restart: ## Restart the docker-compose
+	docker-compose restart
 
 test: ## Run all unit tests
 	go test ./internal/...

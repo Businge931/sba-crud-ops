@@ -12,10 +12,8 @@ import (
 )
 
 func main() {
-	// Load configuration
 	cfg := bootstrap.LoadConfig()
 
-	// Initialize database based on configuration
 	var pool *pgxpool.Pool
 	var gormDB *gorm.DB
 	var err error
