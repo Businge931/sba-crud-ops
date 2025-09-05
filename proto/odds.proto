@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package odds;
+
+option go_package = "github.com/Businge931/sba-crud-ops/proto";
+
+
+service OddsService {
+  rpc CreateOdds(CreateOddsRequest) returns (CreateOddsResponse);
+  rpc GetOdds(GetOddsRequest) returns (GetOddsResponse);
+  rpc UpdateOdds(UpdateOddsRequest) returns (UpdateOddsResponse);
+  rpc DeleteOdds(DeleteOddsRequest) returns (DeleteOddsResponse);
+}
+
+message CreateOddsRequest {
+    string league = 1;
+    string home_team = 2;
+    string away_team = 3;
+    double home_team_win_odds = 4;
+    double away_team_win_odds = 5;
+    double draw_odds = 6;
+    string game_date = 7; // Use string for date, or you can use google.protobuf.Timestamp
+}
+
+
+message CreateOddsResponse {
+    string odds_id = 1;
+}
+
+message GetOddsRequest {
+    string odds_id = 1;
+}
+
+message GetOddsResponse {
+    string odds_id = 1;
+    string league = 2;
+    string home_team = 3;
+    string away_team = 4;
+    double home_team_win_odds = 5;
+    double away_team_win_odds = 6;
+    double draw_odds = 7;
+    string game_date = 8;
+}
+
+message UpdateOddsRequest {
+    string odds_id = 1;
+    string league = 2;
+    string home_team = 3;
+    string away_team = 4;
+    double home_team_win_odds = 5;
+    double away_team_win_odds = 6;
+    double draw_odds = 7;
+    string game_date = 8;
+}
+
+message UpdateOddsResponse {
+  bool success = 1;
+}
+
+message DeleteOddsRequest {
+  string odds_id = 1;
+}
+
+message DeleteOddsResponse {
+  bool success = 1;
+}
